@@ -1,0 +1,1 @@
+Agrega aquí los íconos 192x192 y 512x512 para la PWA cuando los tengas disponibles.

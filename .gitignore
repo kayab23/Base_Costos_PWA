@@ -1,0 +1,17 @@
+# Entornos locales
+.venv/
+Lib/
+Scripts/
+
+# Cachés y artefactos temporales
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Archivos temporales de Office
+~$*
+
+# Configuración local
+*.env
+.vscode/

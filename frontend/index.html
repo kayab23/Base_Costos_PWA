@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base Costos PWA</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <main>
+        <section class="hero">
+            <div>
+                <p class="eyebrow">Pilot build</p>
+                <h1>Tablero de Costos & Pricing</h1>
+                <p class="lede">Consulta catálogos, recalcula landed cost y comparte precios actualizados desde cualquier dispositivo.</p>
+            </div>
+            <div class="card login-card">
+                <h2>Conecta con el backend</h2>
+                <label>URL del API
+                    <input id="api-url" type="url" value="http://localhost:8000" autocomplete="off">
+                </label>
+                <label>Usuario
+                    <input id="username" type="text" value="admin" autocomplete="username">
+                </label>
+                <label>Contraseña
+                    <input id="password" type="password" value="Admin123!" autocomplete="current-password">
+                </label>
+                <button id="connect-btn">Autenticar</button>
+                <p id="status-msg" class="status">Sin conexión</p>
+            </div>
+        </section>
+
+        <section class="grid">
+            <article class="card">
+                <header>
+                    <div>
+                        <h3>Catálogo</h3>
+                        <p>Productos y costos base provenientes de SQL Server.</p>
+                    </div>
+                    <button class="ghost" data-action="load-products">Actualizar</button>
+                </header>
+                <div class="table-wrapper">
+                    <table id="productos-table">
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>Descripción</th>
+                                <th>Proveedor</th>
+                                <th>Moneda</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </article>
+
+            <article class="card">
+                <header>
+                    <div>
+                        <h3>Landed Cost</h3>
+                        <p>Resultados almacenados en LandedCostCache.</p>
+                    </div>
+                    <div class="controls">
+                        <input id="filter-sku" type="text" placeholder="Buscar SKU">
+                        <button class="ghost" data-action="load-landed">Consultar</button>
+                    </div>
+                </header>
+                <div class="table-wrapper">
+                    <table id="landed-table">
+                        <thead>
+                            <tr>
+                                <th>SKU</th>
+                                <th>Transporte</th>
+                                <th>TC</th>
+                                <th>Landed (MXN)</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </article>
+
+            <article class="card">
+                <header>
+                    <div>
+                        <h3>Recalcular</h3>
+                        <p>Ejecuta el motor de cálculos directamente desde la PWA.</p>
+                    </div>
+                </header>
+                <form id="recalc-form" class="recalc-form">
+                    <label>Transporte
+                        <select id="recalc-transporte">
+                            <option value="Maritimo">Marítimo</option>
+                            <option value="Aereo">Aéreo</option>
+                        </select>
+                    </label>
+                    <label>Monedas destino (coma)
+                        <input id="recalc-monedas" type="text" value="MXN,USD">
+                    </label>
+                    <button type="submit">Ejecutar</button>
+                    <p id="recalc-output" class="status">Pendiente</p>
+                </form>
+            </article>
+        </section>
+    </main>
+
+    <script src="app.js" type="module"></script>
+</body>
+</html>
