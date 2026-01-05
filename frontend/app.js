@@ -12,6 +12,9 @@ const selectors = {
     productsTable: document.querySelector('#productos-table tbody'),
     landedTable: document.querySelector('#landed-table tbody'),
     filterSku: document.getElementById('filter-sku'),
+    listaTable: document.querySelector('#lista-table tbody'),
+    listaSku: document.getElementById('filter-precio-sku'),
+    listaCliente: document.getElementById('filter-precio-cliente'),
     recalcForm: document.getElementById('recalc-form'),
     recalcOutput: document.getElementById('recalc-output'),
     recalcTransporte: document.getElementById('recalc-transporte'),
@@ -49,6 +52,9 @@ selectors.connectBtn.addEventListener('click', async () => {
         localStorage.setItem('authToken', token);
         const health = await apiFetch('/health');
         selectors.status.textContent = `Conectado. API v${health.version || '0.1'} lista.`;
+        loadProductos();
+        loadLanded();
+        loadListaPrecios();
     } catch (error) {
         selectors.status.textContent = error.message;
         state.auth = null;
@@ -98,6 +104,57 @@ async function loadLanded() {
     }
 }
 
+async function loadListaPrecios() {
+    try {
+        const params = new URLSearchParams();
+        const sku = selectors.listaSku.value.trim();
+        const cliente = selectors.listaCliente.value.trim();
+        if (sku) params.append('sku', sku);
+        if (cliente) params.append('tipo_cliente', cliente);
+        const query = params.toString() ? `?${params.toString()}` : '';
+        const data = await apiFetch(`/pricing/lista${query}`);
+        const rows = data.slice(0, 25);
+        if (!rows.length) {
+            selectors.listaTable.innerHTML = '<tr><td colspan="10">Sin resultados</td></tr>';
+            return;
+        }
+        selectors.listaTable.innerHTML = rows
+            .map(
+                (row) => `
+                <tr>
+                    <td>${row.sku}</td>
+                    <td>${row.tipo_cliente}</td>
+                    <td>${row.moneda_precio}</td>
+                    <td>${formatNumber(row.tc_mxn, 4)}</td>
+                    <td>${formatCurrency(row.landed_cost_mxn)}</td>
+                    <td>${formatPercent(row.margen_pct)}</td>
+                    <td>${formatCurrency(row.precio_venta_mxn)}</td>
+                    <td>${formatCurrency(row.precio_venta_moneda)}</td>
+                    <td>${formatCurrency(row.precio_min_mxn)}</td>
+                    <td>${row.notas || ''}</td>
+                </tr>`
+            )
+            .join('');
+    } catch (error) {
+        selectors.status.textContent = error.message;
+    }
+}
+
+function formatCurrency(value) {
+    const amount = Number(value ?? 0);
+    return amount.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatNumber(value, digits = 2) {
+    const amount = Number(value ?? 0);
+    return amount.toLocaleString('es-MX', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+
+function formatPercent(value) {
+    const pct = Number(value ?? 0) * 100;
+    return `${pct.toFixed(2)}%`;
+}
+
 selectors.recalcForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     try {
@@ -115,6 +172,7 @@ selectors.recalcForm.addEventListener('submit', async (event) => {
         });
         selectors.recalcOutput.textContent = `Listo. Landed: ${result.landed_rows} | Precios: ${result.price_rows}`;
         loadLanded();
+        loadListaPrecios();
     } catch (error) {
         selectors.recalcOutput.textContent = error.message;
     }
@@ -123,6 +181,7 @@ selectors.recalcForm.addEventListener('submit', async (event) => {
 const actions = {
     'load-products': loadProductos,
     'load-landed': loadLanded,
+    'load-precios': loadListaPrecios,
 };
 
 document.addEventListener('click', (event) => {
@@ -131,6 +190,12 @@ document.addEventListener('click', (event) => {
         actions[action]();
     }
 });
+
+if (state.auth) {
+    loadProductos();
+    loadLanded();
+    loadListaPrecios();
+}
 
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('SW error', err));

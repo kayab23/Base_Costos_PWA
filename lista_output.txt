@@ -1,0 +1,37 @@
+Hoja LISTA_PRECIOS: 2001 filas x 12 columnas
+Encabezados:
+  C01: SKU
+  C02: Tipo_Cliente
+  C03: Moneda_Precio
+  C04: TC_MXN
+  C05: Landed_Cost_MXN
+  C06: Margen_%
+  C07: Precio_Venta_MXN
+  C08: Precio_Venta_Moneda
+  C09: Precio_Min_MXN
+  C10: Notas
+  C11: None
+  C12: USO
+
+Fila de muestra (A2:L2):
+['1199-00063-01', 'Privado', 'USD', '=_xlfn.XLOOKUP(tblPrecios[[#This Row],[Moneda_Precio]],TIPOS_CAMBIO!A:A,TIPOS_CAMBIO!B:B,"",0)', '=_xlfn.XLOOKUP(tblPrecios[[#This Row],[SKU]],LANDED_COST!A:A,LANDED_COST!L:L,"00.00",0)', '=_xlfn.XLOOKUP(tblPrecios[[#This Row],[Tipo_Cliente]],POLITICAS_MARGEN!A:A,POLITICAS_MARGEN!B:B,0,0)', '=IF($F2>0,$E2/(1-$F2),0)', '=IF($D2>0,$G2/$D2,0)', '=$E2*1.15', None, None, 'Ventas debe usar esta hoja (solo lectura). Exporta a CSV/PDF según se requiera.']
+Formulas fila A2-L2:
+  D2: =_xlfn.XLOOKUP(tblPrecios[[#This Row],[Moneda_Precio]],TIPOS_CAMBIO!A:A,TIPOS_CAMBIO!B:B,"",0)
+  E2: =_xlfn.XLOOKUP(tblPrecios[[#This Row],[SKU]],LANDED_COST!A:A,LANDED_COST!L:L,"00.00",0)
+  F2: =_xlfn.XLOOKUP(tblPrecios[[#This Row],[Tipo_Cliente]],POLITICAS_MARGEN!A:A,POLITICAS_MARGEN!B:B,0,0)
+  G2: =IF($F2>0,$E2/(1-$F2),0)
+  H2: =IF($D2>0,$G2/$D2,0)
+  I2: =$E2*1.15
+
+Total de celdas con fórmula: 6599
+Formulas de ejemplo:
+  D2: =_xlfn.XLOOKUP(tblPrecios[[#This Row],[Moneda_Precio]],TIPOS_CAMBIO!A:A,TIPOS_CAMBIO!B:B,"",0)
+  E2: =_xlfn.XLOOKUP(tblPrecios[[#This Row],[SKU]],LANDED_COST!A:A,LANDED_COST!L:L,"00.00",0)
+  F2: =_xlfn.XLOOKUP(tblPrecios[[#This Row],[Tipo_Cliente]],POLITICAS_MARGEN!A:A,POLITICAS_MARGEN!B:B,0,0)
+  G2: =IF($F2>0,$E2/(1-$F2),0)
+  H2: =IF($D2>0,$G2/$D2,0)
+  I2: =$E2*1.15
+  D3: =_xlfn.XLOOKUP(tblPrecios[[#This Row],[Moneda_Precio]],TIPOS_CAMBIO!A:A,TIPOS_CAMBIO!B:B,"",0)
+  E3: =_xlfn.XLOOKUP(tblPrecios[[#This Row],[SKU]],LANDED_COST!A:A,LANDED_COST!L:L,"00.00",0)
+  F3: =_xlfn.XLOOKUP(tblPrecios[[#This Row],[Tipo_Cliente]],POLITICAS_MARGEN!A:A,POLITICAS_MARGEN!B:B,0,0)
+  G3: =IF($F3>0,$E3/(1-$F3),0)

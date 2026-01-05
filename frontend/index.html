@@ -34,8 +34,41 @@
             </div>
         </section>
 
-        <section class="grid">
-            <article class="card">
+        <section class="card price-card">
+            <header>
+                <div>
+                    <p class="eyebrow">LISTA_PRECIOS (SQL)</p>
+                    <h3>Mismos campos y fórmulas que la hoja Excel</h3>
+                    <p>TC = XLOOKUP(Moneda_Precio), Landed = XLOOKUP(SKU), Precio_Venta aplica Margen_% y Precio_Min_MXN respeta el factor 1.15, replicando la lógica de la hoja.</p>
+                </div>
+                <div class="controls stack">
+                    <input id="filter-precio-sku" type="text" placeholder="SKU">
+                    <input id="filter-precio-cliente" type="text" placeholder="Tipo_Cliente">
+                    <button class="ghost" data-action="load-precios">Consultar</button>
+                </div>
+            </header>
+            <div class="table-wrapper">
+                <table id="lista-table">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Tipo_Cliente</th>
+                            <th>Moneda_Precio</th>
+                            <th>TC_MXN</th>
+                            <th>Landed_Cost_MXN</th>
+                            <th>Margen_%</th>
+                            <th>Precio_Venta_MXN</th>
+                            <th>Precio_Venta_Moneda</th>
+                            <th>Precio_Min_MXN</th>
+                            <th>Notas</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+        <section class="grid grid--wrap">
+            <article class="card card--half">
                 <header>
                     <div>
                         <h3>Catálogo</h3>
