@@ -15,7 +15,31 @@ body {
     min-height: 100vh;
     background: radial-gradient(circle at top, #1e1f3b, #05070d 65%);
     color: var(--text);
-    padding: 2rem;
+    padding: 0;
+}
+
+.app-header {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(10px);
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    border-bottom: 1px solid var(--surface);
+    margin-bottom: 2rem;
+}
+
+.app-logo {
+    height: 50px;
+    width: auto;
+    object-fit: contain;
+}
+
+.app-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 0;
 }
 
 main {
@@ -24,6 +48,7 @@ main {
     display: flex;
     flex-direction: column;
     gap: 2rem;
+    padding: 2rem;
 }
 
 .hero {
@@ -40,9 +65,13 @@ main {
     color: var(--muted);
 }
 
-h1 {
-    font-size: clamp(2.5rem, 5vw, 3.5rem);
+h1, h2 {
+    font-size: clamp(2rem, 4vw, 2.5rem);
     margin-top: 0.5rem;
+}
+
+h3 {
+    font-size: 1.5rem;
 }
 
 .lede {
