@@ -43,15 +43,33 @@ async function apiFetch(path, options = {}) {
 selectors.connectBtn.addEventListener('click', async () => {
     try {
         state.baseUrl = selectors.apiUrl.value.trim();
-        const token = btoa(`${selectors.username.value}:${selectors.password.value}`);
+        const username = selectors.username.value.trim();
+        const password = selectors.password.value;
+        
+        if (!username || !password) {
+            selectors.status.textContent = 'Ingrese usuario y contraseña';
+            return;
+        }
+        
+        const token = btoa(`${username}:${password}`);
         state.auth = token;
+        
+        // Primero probar la conexión
+        const testResponse = await fetch(`${state.baseUrl}/health`);
+        if (!testResponse.ok) {
+            throw new Error('No se puede conectar al servidor');
+        }
+        
+        // Luego intentar autenticar
+        await loadProductos();
+        
+        // Si todo salió bien, guardar credenciales
         localStorage.setItem('apiUrl', state.baseUrl);
         localStorage.setItem('authToken', token);
-        const health = await apiFetch('/health');
-        selectors.status.textContent = `Conectado. API v${health.version || '0.1'} lista.`;
-        await loadProductos();
+        
+        selectors.status.textContent = `Conectado. ${state.productos.length} productos cargados.`;
     } catch (error) {
-        selectors.status.textContent = error.message;
+        selectors.status.textContent = `Error: ${error.message}`;
         state.auth = null;
         localStorage.removeItem('authToken');
     }
