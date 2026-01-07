@@ -11,7 +11,6 @@ const selectors = {
     status: document.getElementById('status-msg'),
     connectBtn: document.getElementById('connect-btn'),
     landedTable: document.querySelector('#landed-table tbody'),
-    filterTransporte: document.getElementById('filter-transporte'),
     skuList: document.getElementById('sku-list'),
     skuInputsContainer: document.getElementById('sku-inputs-container'),
     clearSkusBtn: document.getElementById('clear-skus'),
@@ -74,30 +73,40 @@ async function loadProductos() {
 
 async function loadLanded() {
     try {
-        const skuInputs = document.querySelectorAll('.sku-input');
-        const skus = Array.from(skuInputs)
-            .map(input => input.value.trim())
-            .filter(Boolean);
+        const rows = document.querySelectorAll('.sku-input-row');
+        const skuQueries = Array.from(rows)
+            .map(row => {
+                const sku = row.querySelector('.sku-input').value.trim();
+                const transporte = row.querySelector('.transporte-select').value.trim();
+                return { sku, transporte };
+            })
+            .filter(q => q.sku);
         
-        if (skus.length === 0) {
+        if (skuQueries.length === 0) {
             selectors.landedTable.innerHTML = '<tr><td colspan="5">Ingrese al menos un SKU para consultar</td></tr>';
             hideProductDetails();
             return;
         }
 
-        const transporte = selectors.filterTransporte.value.trim();
-        
-        // Hacer consultas para todos los SKUs
-        const promises = skus.map(sku => {
+        // Hacer consultas individuales con su transporte específico
+        const promises = skuQueries.map(query => {
             const params = new URLSearchParams();
-            params.append('sku', sku);
-            if (transporte) params.append('transporte', transporte);
+            params.append('sku', query.sku);
+            if (query.transporte) {
+                params.append('transporte', query.transporte);
+            }
             return apiFetch(`/pricing/landed?${params.toString()}`);
         });
 
         const results = await Promise.all(promises);
         const allData = results.flat();
         
+        if (allData.length === 0) {
+            selectors.landedTable.innerHTML = '<tr><td colspan="5">No se encontraron resultados</td></tr>';
+            hideProductDetails();
+            return;
+        }
+
         selectors.landedTable.innerHTML = allData
             .slice(0, 100)
             .map(
@@ -113,8 +122,9 @@ async function loadLanded() {
             .join('');
         
         // Mostrar detalles de los productos consultados
-        if (skus.length > 0) {
-            showProductDetails(skus);
+        const uniqueSkus = [...new Set(skuQueries.map(q => q.sku))];
+        if (uniqueSkus.length > 0) {
+            showProductDetails(uniqueSkus);
         } else {
             hideProductDetails();
         }
@@ -182,6 +192,21 @@ function addSkuInput() {
     selectors.skuInputsContainer.appendChild(newRow);
 }
 
+function addSkuInput() {
+    const newRow = document.createElement('div');
+    newRow.className = 'sku-input-row';
+    newRow.innerHTML = `
+        <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
+        <select class="transporte-select">
+            <option value="">Ambos transportes</option>
+            <option value="Maritimo">Marítimo</option>
+            <option value="Aereo">Aéreo</option>
+        </select>
+        <button class="icon-btn remove" title="Quitar SKU">×</button>
+    `;
+    selectors.skuInputsContainer.appendChild(newRow);
+}
+
 function removeSkuInput(button) {
     const row = button.closest('.sku-input-row');
     const remainingRows = selectors.skuInputsContainer.querySelectorAll('.sku-input-row');
@@ -194,6 +219,11 @@ function clearAllSkus() {
     selectors.skuInputsContainer.innerHTML = `
         <div class="sku-input-row">
             <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
+            <select class="transporte-select">
+                <option value="">Ambos transportes</option>
+                <option value="Maritimo">Marítimo</option>
+                <option value="Aereo">Aéreo</option>
+            </select>
             <button class="icon-btn add-sku" title="Agregar otro SKU">+</button>
         </div>
     `;
@@ -206,7 +236,6 @@ function formatCurrency(value) {
 }
 
 // Event listeners
-selectors.filterTransporte.addEventListener('change', loadLanded);
 selectors.clearSkusBtn.addEventListener('click', clearAllSkus);
 
 // Event delegation para botones dinámicos

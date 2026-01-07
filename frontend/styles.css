@@ -131,6 +131,13 @@ button.ghost {
     margin-bottom: 1rem;
 }
 
+.controls-header h4 {
+    margin: 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--accent);
+}
+
 .button-group {
     display: flex;
     gap: 0.5rem;
@@ -150,7 +157,13 @@ button.ghost {
 }
 
 .sku-input {
+    flex: 2;
+    min-width: 200px;
+}
+
+.transporte-select {
     flex: 1;
+    min-width: 150px;
 }
 
 .icon-btn {

@@ -41,11 +41,7 @@
                     <p>Resultados almacenados en LandedCostCache con Mark-up del 10%.</p>
                 </div>
                 <div class="controls-header">
-                    <select id="filter-transporte">
-                        <option value="">Todos los transportes</option>
-                        <option value="Maritimo">Marítimo</option>
-                        <option value="Aereo">Aéreo</option>
-                    </select>
+                    <h4>SKUs a cotizar:</h4>
                     <div class="button-group">
                         <button class="ghost" data-action="load-landed">Consultar</button>
                         <button class="ghost" id="clear-skus">Limpiar</button>
@@ -54,6 +50,11 @@
                 <div id="sku-inputs-container" class="sku-inputs">
                     <div class="sku-input-row">
                         <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
+                        <select class="transporte-select">
+                            <option value="">Ambos transportes</option>
+                            <option value="Maritimo">Marítimo</option>
+                            <option value="Aereo">Aéreo</option>
+                        </select>
                         <button class="icon-btn add-sku" title="Agregar otro SKU">+</button>
                     </div>
                 </div>
