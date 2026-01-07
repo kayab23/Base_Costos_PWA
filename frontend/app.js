@@ -41,10 +41,15 @@ async function apiFetch(path, options = {}) {
 }
 
 selectors.connectBtn.addEventListener('click', async () => {
+    console.log('Botón clickeado');
     try {
+        selectors.status.textContent = 'Conectando...';
         state.baseUrl = selectors.apiUrl.value.trim();
         const username = selectors.username.value.trim();
         const password = selectors.password.value;
+        
+        console.log('URL:', state.baseUrl);
+        console.log('Usuario:', username);
         
         if (!username || !password) {
             selectors.status.textContent = 'Ingrese usuario y contraseña';
@@ -55,12 +60,16 @@ selectors.connectBtn.addEventListener('click', async () => {
         state.auth = token;
         
         // Primero probar la conexión
+        console.log('Probando conexión...');
         const testResponse = await fetch(`${state.baseUrl}/health`);
+        console.log('Respuesta health:', testResponse.status);
+        
         if (!testResponse.ok) {
             throw new Error('No se puede conectar al servidor');
         }
         
         // Luego intentar autenticar
+        console.log('Cargando productos...');
         await loadProductos();
         
         // Si todo salió bien, guardar credenciales
@@ -68,7 +77,9 @@ selectors.connectBtn.addEventListener('click', async () => {
         localStorage.setItem('authToken', token);
         
         selectors.status.textContent = `Conectado. ${state.productos.length} productos cargados.`;
+        console.log('Autenticación exitosa');
     } catch (error) {
+        console.error('Error en autenticación:', error);
         selectors.status.textContent = `Error: ${error.message}`;
         state.auth = null;
         localStorage.removeItem('authToken');
@@ -81,7 +92,11 @@ async function loadProductos() {
         state.productos = data;
         // Poblar datalist para autocompletado
         selectors.skuList.innerHTML = data
-            .map((p) => `<option value="${p.sku}">${p.descripcion || p.sku}</option>`)
+            .map((p) => {
+                // Mostrar solo las primeras 60 caracteres de la descripción
+                const desc = p.descripcion ? p.descripcion.substring(0, 60) + (p.descripcion.length > 60 ? '...' : '') : p.sku;
+                return `<option value="${p.sku}">${desc}</option>`;
+            })
             .join('');
     } catch (error) {
         console.error('Error cargando productos:', error);
@@ -197,16 +212,6 @@ function showProductDetails(skus) {
 
 function hideProductDetails() {
     selectors.productDetailsCard.style.display = 'none';
-}
-
-function addSkuInput() {
-    const newRow = document.createElement('div');
-    newRow.className = 'sku-input-row';
-    newRow.innerHTML = `
-        <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
-        <button class="icon-btn remove" title="Quitar SKU">×</button>
-    `;
-    selectors.skuInputsContainer.appendChild(newRow);
 }
 
 function addSkuInput() {

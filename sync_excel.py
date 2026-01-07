@@ -18,8 +18,8 @@ from openpyxl import load_workbook
 FILE_NAME = "Plantilla_Pricing_Costos_Importacion.xlsx"
 DEFAULT_CONN_STR = (
     "DRIVER={ODBC Driver 18 for SQL Server};"
-    "SERVER=localhost;"
-    "DATABASE=BaseCostos;"
+    "SERVER=localhost\\SQLEXPRESS;"
+    "DATABASE=BD_Calculo_Costos;"
     "UID=sa;PWD=YourStrongPassword!;"
     "TrustServerCertificate=yes;"
 )
@@ -215,7 +215,7 @@ def main() -> None:
         "costos": wb["COSTO_BASE"],
         "parametros": wb["PARAMETROS_IMPORTACION"],
         "tipos_cambio": wb["TIPOS_CAMBIO"],
-        "margenes": wb["POLITICAS_MARGEN"],
+        "margenes": wb["POLITICAS_MARGEN"] if "POLITICAS_MARGEN" in wb.sheetnames else None,
         "control": control_sheet,
     }
 
@@ -228,7 +228,7 @@ def main() -> None:
         cost_rows = read_costos(sheets["costos"], version_id)
         param_rows = read_parametros(sheets["parametros"], version_id)
         fx_rows = read_tipos_cambio(sheets["tipos_cambio"], version_id)
-        margin_rows = read_margenes(sheets["margenes"], version_id)
+        margin_rows = read_margenes(sheets["margenes"], version_id) if sheets["margenes"] else []
         control_rows = read_control_versiones(sheets["control"]) if sheets["control"] else []
 
         clear_tables(cursor, [

@@ -15,9 +15,14 @@ __pycache__/
 # Archivos Excel de datos
 *.xlsx
 
-# Archivos temporales de análisis
+# Archivos temporales de análisis y debug
 tmp_*
 temp_*
+check_sku.py
+fix_*.py
+output.txt
+debug_*.py
+test_*.py
 test_*
 check_*
 verify_*
