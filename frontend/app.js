@@ -50,7 +50,6 @@ selectors.connectBtn.addEventListener('click', async () => {
         const health = await apiFetch('/health');
         selectors.status.textContent = `Conectado. API v${health.version || '0.1'} lista.`;
         await loadProductos();
-        loadLanded();
     } catch (error) {
         selectors.status.textContent = error.message;
         state.auth = null;
@@ -270,8 +269,9 @@ if (state.auth) {
     loadProductos();
 }
 
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('SW error', err));
-    });
-}
+// Service Worker desactivado temporalmente
+// if ('serviceWorker' in navigator) {
+//     window.addEventListener('load', () => {
+//         navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('SW error', err));
+//     });
+// }
