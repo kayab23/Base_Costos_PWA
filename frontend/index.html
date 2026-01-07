@@ -40,16 +40,24 @@
                     <h3>Landed Cost</h3>
                     <p>Resultados almacenados en LandedCostCache con Mark-up del 10%.</p>
                 </div>
-                <div class="controls">
-                    <input id="filter-sku" type="text" placeholder="Buscar SKU" list="sku-list" autocomplete="off">
-                    <datalist id="sku-list"></datalist>
+                <div class="controls-header">
                     <select id="filter-transporte">
                         <option value="">Todos los transportes</option>
                         <option value="Maritimo">Marítimo</option>
                         <option value="Aereo">Aéreo</option>
                     </select>
-                    <button class="ghost" data-action="load-landed">Consultar</button>
+                    <div class="button-group">
+                        <button class="ghost" data-action="load-landed">Consultar</button>
+                        <button class="ghost" id="clear-skus">Limpiar</button>
+                    </div>
                 </div>
+                <div id="sku-inputs-container" class="sku-inputs">
+                    <div class="sku-input-row">
+                        <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
+                        <button class="icon-btn add-sku" title="Agregar otro SKU">+</button>
+                    </div>
+                </div>
+                <datalist id="sku-list"></datalist>
             </header>
             <div class="table-wrapper">
                 <table id="landed-table">
@@ -69,33 +77,10 @@
 
         <section class="card" id="product-details-card" style="display: none;">
             <header>
-                <h3>Detalles del Producto</h3>
+                <h3>Detalles de Productos</h3>
             </header>
-            <div id="product-details" class="details-grid">
-                <div class="detail-item">
-                    <span class="detail-label">SKU:</span>
-                    <span id="detail-sku" class="detail-value">-</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Descripción:</span>
-                    <span id="detail-descripcion" class="detail-value">-</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Proveedor:</span>
-                    <span id="detail-proveedor" class="detail-value">-</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Origen:</span>
-                    <span id="detail-origen" class="detail-value">-</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Categoría:</span>
-                    <span id="detail-categoria" class="detail-value">-</span>
-                </div>
-                <div class="detail-item">
-                    <span class="detail-label">Moneda Base:</span>
-                    <span id="detail-moneda" class="detail-value">-</span>
-                </div>
+            <div id="product-details" class="products-details-container">
+                <!-- Se llenará dinámicamente con JavaScript -->
             </div>
         </section>
     </main>

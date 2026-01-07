@@ -123,6 +123,86 @@ button.ghost {
     gap: 0.5rem;
 }
 
+.controls-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.button-group {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.sku-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.sku-input-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.sku-input {
+    flex: 1;
+}
+
+.icon-btn {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    padding: 0;
+    font-size: 1.5rem;
+    font-weight: 600;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #031d18;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.icon-btn:hover {
+    background: var(--accent-strong);
+    transform: scale(1.1);
+}
+
+.icon-btn.remove {
+    background: rgba(255, 100, 100, 0.2);
+    color: #ff6464;
+    border: 1px solid #ff6464;
+}
+
+.icon-btn.remove:hover {
+    background: rgba(255, 100, 100, 0.3);
+}
+
+.products-details-container {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+.product-detail-card {
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    padding: 1rem;
+}
+
+.product-detail-header {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .table-wrapper {
     max-height: 320px;
     overflow: auto;

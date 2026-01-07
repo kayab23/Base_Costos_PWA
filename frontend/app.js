@@ -11,16 +11,12 @@ const selectors = {
     status: document.getElementById('status-msg'),
     connectBtn: document.getElementById('connect-btn'),
     landedTable: document.querySelector('#landed-table tbody'),
-    filterSku: document.getElementById('filter-sku'),
     filterTransporte: document.getElementById('filter-transporte'),
     skuList: document.getElementById('sku-list'),
+    skuInputsContainer: document.getElementById('sku-inputs-container'),
+    clearSkusBtn: document.getElementById('clear-skus'),
     productDetailsCard: document.getElementById('product-details-card'),
-    detailSku: document.getElementById('detail-sku'),
-    detailDescripcion: document.getElementById('detail-descripcion'),
-    detailProveedor: document.getElementById('detail-proveedor'),
-    detailOrigen: document.getElementById('detail-origen'),
-    detailCategoria: document.getElementById('detail-categoria'),
-    detailMoneda: document.getElementById('detail-moneda'),
+    productDetails: document.getElementById('product-details'),
 };
 
 if (state.baseUrl) selectors.apiUrl.value = state.baseUrl;
@@ -78,15 +74,32 @@ async function loadProductos() {
 
 async function loadLanded() {
     try {
-        const sku = selectors.filterSku.value.trim();
+        const skuInputs = document.querySelectorAll('.sku-input');
+        const skus = Array.from(skuInputs)
+            .map(input => input.value.trim())
+            .filter(Boolean);
+        
+        if (skus.length === 0) {
+            selectors.landedTable.innerHTML = '<tr><td colspan="5">Ingrese al menos un SKU para consultar</td></tr>';
+            hideProductDetails();
+            return;
+        }
+
         const transporte = selectors.filterTransporte.value.trim();
-        const params = new URLSearchParams();
-        if (sku) params.append('sku', sku);
-        if (transporte) params.append('transporte', transporte);
-        const query = params.toString() ? `?${params.toString()}` : '';
-        const data = await apiFetch(`/pricing/landed${query}`);
-        selectors.landedTable.innerHTML = data
-            .slice(0, 25)
+        
+        // Hacer consultas para todos los SKUs
+        const promises = skus.map(sku => {
+            const params = new URLSearchParams();
+            params.append('sku', sku);
+            if (transporte) params.append('transporte', transporte);
+            return apiFetch(`/pricing/landed?${params.toString()}`);
+        });
+
+        const results = await Promise.all(promises);
+        const allData = results.flat();
+        
+        selectors.landedTable.innerHTML = allData
+            .slice(0, 100)
             .map(
                 (row) => `
                 <tr>
@@ -99,30 +112,56 @@ async function loadLanded() {
             )
             .join('');
         
-        // Mostrar detalles del producto si se filtró por SKU
-        if (sku) {
-            showProductDetails(sku);
+        // Mostrar detalles de los productos consultados
+        if (skus.length > 0) {
+            showProductDetails(skus);
         } else {
             hideProductDetails();
         }
     } catch (error) {
         selectors.status.textContent = error.message;
-    }() => {
-    // Debounce para evitar múltiples llamadas
-    clearTimeout(selectors.filterSku.debounce);
-    selectors.filterSku.debounce = setTimeout(loadLanded, 300);
-}
+    }
 }
 
-function showProductDetails(sku) {
-    const producto = state.productos.find((p) => p.sku === sku);
-    if (producto) {
-        selectors.detailSku.textContent = producto.sku || '-';
-        selectors.detailDescripcion.textContent = producto.descripcion || '-';
-        selectors.detailProveedor.textContent = producto.proveedor || '-';
-        selectors.detailOrigen.textContent = producto.origen || '-';
-        selectors.detailCategoria.textContent = producto.categoria || '-';
-        selectors.detailMoneda.textContent = producto.moneda_base || '-';
+function showProductDetails(skus) {
+    const productos = skus
+        .map(sku => state.productos.find(p => p.sku === sku))
+        .filter(Boolean);
+    
+    if (productos.length > 0) {
+        selectors.productDetails.innerHTML = productos
+            .map(producto => `
+                <div class="product-detail-card">
+                    <div class="product-detail-header">${producto.sku}</div>
+                    <div class="details-grid">
+                        <div class="detail-item">
+                            <span class="detail-label">Descripción:</span>
+                            <span class="detail-value">${producto.descripcion || '-'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Proveedor:</span>
+                            <span class="detail-value">${producto.proveedor || '-'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Origen:</span>
+                            <span class="detail-value">${producto.origen || '-'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Categoría:</span>
+                            <span class="detail-value">${producto.categoria || '-'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Moneda Base:</span>
+                            <span class="detail-value">${producto.moneda_base || '-'}</span>
+                        </div>
+                        <div class="detail-item">
+                            <span class="detail-label">Activo:</span>
+                            <span class="detail-value">${producto.activo ? 'Sí' : 'No'}</span>
+                        </div>
+                    </div>
+                </div>
+            `)
+            .join('');
         selectors.productDetailsCard.style.display = 'block';
     } else {
         hideProductDetails();
@@ -133,16 +172,59 @@ function hideProductDetails() {
     selectors.productDetailsCard.style.display = 'none';
 }
 
+function addSkuInput() {
+    const newRow = document.createElement('div');
+    newRow.className = 'sku-input-row';
+    newRow.innerHTML = `
+        <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
+        <button class="icon-btn remove" title="Quitar SKU">×</button>
+    `;
+    selectors.skuInputsContainer.appendChild(newRow);
+}
+
+function removeSkuInput(button) {
+    const row = button.closest('.sku-input-row');
+    const remainingRows = selectors.skuInputsContainer.querySelectorAll('.sku-input-row');
+    if (remainingRows.length > 1) {
+        row.remove();
+    }
+}
+
+function clearAllSkus() {
+    selectors.skuInputsContainer.innerHTML = `
+        <div class="sku-input-row">
+            <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
+            <button class="icon-btn add-sku" title="Agregar otro SKU">+</button>
+        </div>
+    `;
+    selectors.landedTable.innerHTML = '';
+    hideProductDetails();
+}
+
 function formatCurrency(value) {
     return (value ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 });
 }
 
-selectors.filterSku.addEventListener('input', () => {
-    // Debounce para evitar múltiples llamadas
-    clearTimeout(selectors.filterSku.debounce);
-    selectors.filterSku.debounce = setTimeout(loadLanded, 300);
-});
+// Event listeners
 selectors.filterTransporte.addEventListener('change', loadLanded);
+selectors.clearSkusBtn.addEventListener('click', clearAllSkus);
+
+// Event delegation para botones dinámicos
+selectors.skuInputsContainer.addEventListener('click', (e) => {
+    if (e.target.classList.contains('add-sku')) {
+        addSkuInput();
+    } else if (e.target.classList.contains('remove')) {
+        removeSkuInput(e.target);
+    }
+});
+
+// Debounce en inputs de SKU
+selectors.skuInputsContainer.addEventListener('input', (e) => {
+    if (e.target.classList.contains('sku-input')) {
+        clearTimeout(state.debounceTimer);
+        state.debounceTimer = setTimeout(loadLanded, 500);
+    }
+});
 
 const actions = {
     'load-landed': loadLanded,
@@ -156,9 +238,11 @@ document.addEventListener('click', (event) => {
 });
 
 if (state.auth) {
-    loadProductos().then(() => loadLanded());
+    loadProductos();
 }
 
 if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('SW error', err));
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('SW error', err));
+    });
 }
