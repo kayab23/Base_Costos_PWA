@@ -15,20 +15,25 @@ router = APIRouter(prefix="/pricing", tags=["Pricing"])
 @router.get("/landed", response_model=list[schemas.LandedCost])
 def list_landed_cost(
     sku: str | None = Query(default=None, description="Filtra por SKU exacto"),
+    transporte: str | None = Query(default=None, description="Filtra por Transporte (Maritimo/Aereo)"),
     conn=Depends(get_connection),
     user=Depends(get_current_user),
 ):
     cursor = conn.cursor()
     query = """
         SELECT sku, transporte, origen, moneda_base, costo_base, tc_mxn, costo_base_mxn,
-               flete_pct, seguro_pct, arancel_pct, gastos_aduana_mxn, landed_cost_mxn,
+               flete_pct, seguro_pct, arancel_pct, gastos_aduana_mxn, landed_cost_mxn, mark_up,
                version_id, calculado_en
         FROM dbo.LandedCostCache
+        WHERE 1=1
     """
     params: list[str] = []
     if sku:
-        query += " WHERE sku = ?"
+        query += " AND sku = ?"
         params.append(sku)
+    if transporte:
+        query += " AND transporte = ?"
+        params.append(transporte)
     query += " ORDER BY sku"
     return fetch_all(cursor, query, params)
 

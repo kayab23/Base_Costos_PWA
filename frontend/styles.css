@@ -26,15 +26,6 @@ main {
     gap: 2rem;
 }
 
-
-.price-card header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 2rem;
-    flex-wrap: wrap;
-}
-
 .hero {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -119,18 +110,6 @@ button.ghost {
     gap: 1.5rem;
 }
 
-.grid.grid--wrap {
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-}
-
-.card.card--half {
-    min-height: 100%;
-}
-
-.card.card--full {
-    grid-column: 1 / -1;
-}
-
 .card header {
     display: flex;
     justify-content: space-between;
@@ -142,18 +121,6 @@ button.ghost {
 .controls {
     display: flex;
     gap: 0.5rem;
-}
-
-.controls input {
-    min-width: 120px;
-}
-
-.controls.stack {
-    flex-wrap: wrap;
-}
-
-.controls.stack input {
-    flex: 1 1 140px;
 }
 
 .table-wrapper {
@@ -180,6 +147,35 @@ thead th {
     text-transform: uppercase;
     letter-spacing: 0.1em;
     color: var(--muted);
+}
+
+.details-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+}
+
+.detail-item {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.detail-label {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+}
+
+.detail-value {
+    font-size: 1rem;
+    color: var(--text);
+    font-weight: 500;
+}
+
+datalist {
+    background: var(--surface-strong);
 }
 
 @media (max-width: 640px) {

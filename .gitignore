@@ -12,6 +12,25 @@ __pycache__/
 # Archivos temporales de Office
 ~$*
 
+# Archivos Excel de datos
+*.xlsx
+
+# Archivos temporales de análisis
+tmp_*
+temp_*
+test_*
+check_*
+verify_*
+compare_*
+analyze_*
+inspect_*
+fix_*
+call_*
+list_*
+*.txt
+!requirements.txt
+!README.txt
+
 # Configuración local
 *.env
 .vscode/

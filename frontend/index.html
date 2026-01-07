@@ -34,110 +34,69 @@
             </div>
         </section>
 
-        <section class="card price-card">
+        <section class="card">
             <header>
                 <div>
-                    <p class="eyebrow">LISTA_PRECIOS (SQL)</p>
-                    <h3>Mismos campos y fórmulas que la hoja Excel</h3>
-                    <p>TC = XLOOKUP(Moneda_Precio), Landed = XLOOKUP(SKU), Precio_Venta aplica Margen_% y Precio_Min_MXN respeta el factor 1.15, replicando la lógica de la hoja.</p>
+                    <h3>Landed Cost</h3>
+                    <p>Resultados almacenados en LandedCostCache con Mark-up del 10%.</p>
                 </div>
-                <div class="controls stack">
-                    <input id="filter-precio-sku" type="text" placeholder="SKU">
-                    <input id="filter-precio-cliente" type="text" placeholder="Tipo_Cliente">
-                    <button class="ghost" data-action="load-precios">Consultar</button>
+                <div class="controls">
+                    <input id="filter-sku" type="text" placeholder="Buscar SKU" list="sku-list" autocomplete="off">
+                    <datalist id="sku-list"></datalist>
+                    <select id="filter-transporte">
+                        <option value="">Todos los transportes</option>
+                        <option value="Maritimo">Marítimo</option>
+                        <option value="Aereo">Aéreo</option>
+                    </select>
+                    <button class="ghost" data-action="load-landed">Consultar</button>
                 </div>
             </header>
             <div class="table-wrapper">
-                <table id="lista-table">
+                <table id="landed-table">
                     <thead>
                         <tr>
                             <th>SKU</th>
-                            <th>Tipo_Cliente</th>
-                            <th>Moneda_Precio</th>
-                            <th>TC_MXN</th>
-                            <th>Landed_Cost_MXN</th>
-                            <th>Margen_%</th>
-                            <th>Precio_Venta_MXN</th>
-                            <th>Precio_Venta_Moneda</th>
-                            <th>Precio_Min_MXN</th>
-                            <th>Notas</th>
+                            <th>Transporte</th>
+                            <th>Costo Base MXN</th>
+                            <th>Landed Cost MXN</th>
+                            <th>Mark-up (10%)</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
                 </table>
             </div>
         </section>
-        <section class="grid grid--wrap">
-            <article class="card card--half">
-                <header>
-                    <div>
-                        <h3>Catálogo</h3>
-                        <p>Productos y costos base provenientes de SQL Server.</p>
-                    </div>
-                    <button class="ghost" data-action="load-products">Actualizar</button>
-                </header>
-                <div class="table-wrapper">
-                    <table id="productos-table">
-                        <thead>
-                            <tr>
-                                <th>SKU</th>
-                                <th>Descripción</th>
-                                <th>Proveedor</th>
-                                <th>Moneda</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
-                </div>
-            </article>
 
-            <article class="card">
-                <header>
-                    <div>
-                        <h3>Landed Cost</h3>
-                        <p>Resultados almacenados en LandedCostCache.</p>
-                    </div>
-                    <div class="controls">
-                        <input id="filter-sku" type="text" placeholder="Buscar SKU">
-                        <button class="ghost" data-action="load-landed">Consultar</button>
-                    </div>
-                </header>
-                <div class="table-wrapper">
-                    <table id="landed-table">
-                        <thead>
-                            <tr>
-                                <th>SKU</th>
-                                <th>Transporte</th>
-                                <th>TC</th>
-                                <th>Landed (MXN)</th>
-                            </tr>
-                        </thead>
-                        <tbody></tbody>
-                    </table>
+        <section class="card" id="product-details-card" style="display: none;">
+            <header>
+                <h3>Detalles del Producto</h3>
+            </header>
+            <div id="product-details" class="details-grid">
+                <div class="detail-item">
+                    <span class="detail-label">SKU:</span>
+                    <span id="detail-sku" class="detail-value">-</span>
                 </div>
-            </article>
-
-            <article class="card">
-                <header>
-                    <div>
-                        <h3>Recalcular</h3>
-                        <p>Ejecuta el motor de cálculos directamente desde la PWA.</p>
-                    </div>
-                </header>
-                <form id="recalc-form" class="recalc-form">
-                    <label>Transporte
-                        <select id="recalc-transporte">
-                            <option value="Maritimo">Marítimo</option>
-                            <option value="Aereo">Aéreo</option>
-                        </select>
-                    </label>
-                    <label>Monedas destino (coma)
-                        <input id="recalc-monedas" type="text" value="MXN,USD">
-                    </label>
-                    <button type="submit">Ejecutar</button>
-                    <p id="recalc-output" class="status">Pendiente</p>
-                </form>
-            </article>
+                <div class="detail-item">
+                    <span class="detail-label">Descripción:</span>
+                    <span id="detail-descripcion" class="detail-value">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Proveedor:</span>
+                    <span id="detail-proveedor" class="detail-value">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Origen:</span>
+                    <span id="detail-origen" class="detail-value">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Categoría:</span>
+                    <span id="detail-categoria" class="detail-value">-</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Moneda Base:</span>
+                    <span id="detail-moneda" class="detail-value">-</span>
+                </div>
+            </div>
         </section>
     </main>
 

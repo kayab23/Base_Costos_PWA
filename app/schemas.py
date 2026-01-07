@@ -61,6 +61,7 @@ class LandedCost(BaseModel):
     arancel_pct: Optional[float]
     gastos_aduana_mxn: Optional[float]
     landed_cost_mxn: Optional[float]
+    mark_up: Optional[float]
     version_id: Optional[int]
     calculado_en: Optional[datetime]
 

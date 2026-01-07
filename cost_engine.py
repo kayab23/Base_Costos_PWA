@@ -53,10 +53,8 @@ def fetch_reference_data(cursor: pyodbc.Cursor) -> Dict[str, Any]:
         cursor,
         "SELECT moneda, tipo_cambio_mxn, fecha FROM dbo.TiposCambio",
     )
-    data["margenes"] = fetch_dicts(
-        cursor,
-        "SELECT tipo_cliente, margen FROM dbo.PoliticasMargen WHERE vigente_hasta IS NULL",
-    )
+    # PoliticasMargen no se usa en este proyecto, retornar lista vacía
+    data["margenes"] = []
     version_row = fetch_dicts(cursor, "SELECT MAX(version_id) AS version_id FROM dbo.Versiones")
     data["version_id"] = version_row[0]["version_id"] if version_row else None
     return data
@@ -131,7 +129,9 @@ def calculate_landed_costs(
     flete_pct = pct_params.get(transporte_key, 0.0)
     seguro_pct = pct_params.get("seguro", 0.0)
     arancel_pct = pct_params.get("arancel", 0.0)
-    gastos_aduana = fixed_params.get("gastos_aduana", 0.0)
+    gastos_aduana_pct = pct_params.get("gastos_aduana", 0.0)
+    gastos_aduana_fijo = fixed_params.get("gastos_aduana", 0.0)
+    markup_pct = pct_params.get("mark_up", 0.1)  # 10% por defecto
 
     landed_rows: List[Dict[str, Any]] = []
     for producto in productos:
@@ -144,9 +144,13 @@ def calculate_landed_costs(
 
         origen = (producto.get("origen") or "").strip().lower()
         if origen == "importado":
-            landed = costo_base_mxn * (1 + flete_pct + seguro_pct + arancel_pct) + gastos_aduana
+            # Fórmula corregida: Gastos_Aduana como porcentaje sumado con los demás
+            landed = costo_base_mxn * (1 + flete_pct + seguro_pct + arancel_pct + gastos_aduana_pct) + gastos_aduana_fijo
         else:
             landed = costo_base_mxn
+        
+        # Calcular Mark_up: Landed Cost × (1 + markup_pct)
+        mark_up = landed * (1 + markup_pct)
 
         landed_rows.append(
             {
@@ -160,8 +164,9 @@ def calculate_landed_costs(
                 "flete_pct": flete_pct,
                 "seguro_pct": seguro_pct,
                 "arancel_pct": arancel_pct,
-                "gastos_aduana_mxn": gastos_aduana,
+                "gastos_aduana_mxn": costo_base_mxn * gastos_aduana_pct + gastos_aduana_fijo,
                 "landed_cost_mxn": landed,
+                "mark_up": mark_up,
                 "version_id": version_id,
                 "calculado_en": datetime.now(timezone.utc),
             }
@@ -215,10 +220,16 @@ def persist_rows(
     table: str,
     columns: Sequence[str],
     rows: Iterable[Dict[str, Any]],
+    transporte: str | None = None,
 ) -> None:
     rows = list(rows)
     print(f"{table}: escribiendo {len(rows)} filas")
-    cursor.execute(f"DELETE FROM {table}")
+    # Si es LandedCostCache, solo eliminar registros del transporte específico
+    if table == "dbo.LandedCostCache" and transporte:
+        cursor.execute(f"DELETE FROM {table} WHERE transporte = ?", transporte)
+        print(f"  (eliminados registros existentes de transporte: {transporte})")
+    else:
+        cursor.execute(f"DELETE FROM {table}")
     if not rows:
         return
     placeholders = ",".join(["?"] * len(columns))
@@ -267,13 +278,6 @@ def run_calculations(
             transporte,
             data["version_id"],
         )
-        price_rows = calculate_price_list(
-            landed_rows,
-            data["margenes"],
-            fx_map,
-            monedas,
-            data["version_id"],
-        )
 
         persist_rows(
             cursor,
@@ -291,41 +295,22 @@ def run_calculations(
                 "arancel_pct",
                 "gastos_aduana_mxn",
                 "landed_cost_mxn",
+                "mark_up",
                 "version_id",
                 "calculado_en",
             ],
             landed_rows,
-        )
-
-        persist_rows(
-            cursor,
-            "dbo.ListaPrecios",
-            [
-                "sku",
-                "tipo_cliente",
-                "moneda_precio",
-                "tc_mxn",
-                "landed_cost_mxn",
-                "margen_pct",
-                "precio_venta_mxn",
-                "precio_venta_moneda",
-                "precio_min_mxn",
-                "notas",
-                "version_id",
-                "calculado_en",
-            ],
-            price_rows,
+            transporte,  # Pasar el transporte para eliminar solo ese tipo
         )
 
         conn.commit()
         summary = {
             "landed_rows": len(landed_rows),
-            "price_rows": len(price_rows),
+            "price_rows": 0,
             "version_id": data.get("version_id"),
         }
         print(
-            "Cálculos almacenados correctamente. "
-            f"Landed={summary['landed_rows']} Precios={summary['price_rows']}"
+            f"\n✅ Cálculos almacenados correctamente. Landed={summary['landed_rows']}"
         )
         return summary
     finally:
