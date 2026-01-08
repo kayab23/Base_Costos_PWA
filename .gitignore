@@ -12,9 +12,6 @@ __pycache__/
 # Archivos temporales de Office
 ~$*
 
-# Archivos Excel de datos
-*.xlsx
-
 # Archivos temporales de análisis y debug
 tmp_*
 temp_*
