@@ -108,6 +108,12 @@ button {
     background: rgba(255, 255, 255, 0.08);
 }
 
+select option {
+    background: #1a2e2a;
+    color: #e0e7e4;
+    padding: 0.5rem;
+}
+
 button {
     background: var(--accent);
     color: #031d18;

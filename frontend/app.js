@@ -254,7 +254,10 @@ function clearAllSkus() {
 }
 
 function formatCurrency(value) {
-    return (value ?? 0).toLocaleString('es-MX', { minimumFractionDigits: 2 });
+    return (value ?? 0).toLocaleString('es-MX', { 
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
 }
 
 // Event listeners
