@@ -23,7 +23,7 @@ def list_landed_cost(
     query = """
         SELECT sku, transporte, origen, moneda_base, costo_base, tc_mxn, costo_base_mxn,
                flete_pct, seguro_pct, arancel_pct, gastos_aduana_mxn, landed_cost_mxn, mark_up,
-               version_id, calculado_en
+               calculado_en
         FROM dbo.LandedCostCache
         WHERE 1=1
     """
@@ -49,7 +49,7 @@ def list_precios(
     query = """
         SELECT sku, tipo_cliente, moneda_precio, tc_mxn, landed_cost_mxn, margen_pct,
                precio_venta_mxn, precio_venta_moneda, precio_min_mxn, notas,
-               version_id, calculado_en
+               calculado_en
         FROM dbo.ListaPrecios
         WHERE 1=1
     """

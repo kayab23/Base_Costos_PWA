@@ -64,7 +64,6 @@ class LandedCost(BaseModel):
     gastos_aduana_mxn: Optional[float]
     landed_cost_mxn: Optional[float]
     mark_up: Optional[float]
-    version_id: Optional[int]
     calculado_en: Optional[datetime]
 
 
@@ -79,7 +78,6 @@ class PrecioVenta(BaseModel):
     precio_venta_moneda: Optional[float]
     precio_min_mxn: Optional[float]
     notas: Optional[str]
-    version_id: Optional[int]
     calculado_en: Optional[datetime]
 
 
@@ -91,4 +89,3 @@ class RecalculateRequest(BaseModel):
 class RecalculateResponse(BaseModel):
     landed_rows: int
     price_rows: int
-    version_id: Optional[int]
