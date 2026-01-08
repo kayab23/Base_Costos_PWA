@@ -57,16 +57,4 @@ def list_tipos_cambio(conn=Depends(get_connection), user=Depends(get_current_use
     return rows
 
 
-@router.get("/margenes", response_model=list[schemas.PoliticaMargen])
-def list_margenes(conn=Depends(get_connection), user=Depends(get_current_user)):
-    cursor = conn.cursor()
-    rows = fetch_all(
-        cursor,
-        """
-        SELECT tipo_cliente, margen, notas
-        FROM dbo.PoliticasMargen
-        WHERE vigente_hasta IS NULL
-        ORDER BY tipo_cliente
-        """,
-    )
-    return rows
+# Endpoint eliminado: /margenes (tabla PoliticasMargen eliminada)

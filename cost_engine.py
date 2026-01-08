@@ -50,10 +50,8 @@ def fetch_reference_data(cursor: pyodbc.Cursor) -> Dict[str, Any]:
         cursor,
         "SELECT moneda, tipo_cambio_mxn, fecha FROM dbo.TiposCambio",
     )
-    # PoliticasMargen no se usa en este proyecto, retornar lista vacía
+    # Tablas PoliticasMargen y Versiones eliminadas
     data["margenes"] = []
-    version_row = fetch_dicts(cursor, "SELECT MAX(version_id) AS version_id FROM dbo.Versiones")
-    data["version_id"] = version_row[0]["version_id"] if version_row else None
     return data
 
 
@@ -120,7 +118,6 @@ def calculate_landed_costs(
     pct_params: Dict[str, float],
     fixed_params: Dict[str, float],
     transporte: str,
-    version_id: int | None,
 ) -> List[Dict[str, Any]]:
     transporte_key = transporte.strip().lower()
     flete_pct = pct_params.get(transporte_key, 0.0)
@@ -164,7 +161,6 @@ def calculate_landed_costs(
                 "gastos_aduana_mxn": costo_base_mxn * gastos_aduana_pct + gastos_aduana_fijo,
                 "landed_cost_mxn": landed,
                 "mark_up": mark_up,
-                "version_id": version_id,
                 "calculado_en": datetime.now(timezone.utc),
             }
         )
@@ -176,7 +172,6 @@ def calculate_price_list(
     margenes: Iterable[Dict[str, Any]],
     fx_map: Dict[str, float],
     monedas_precio: Sequence[str],
-    version_id: int | None,
 ) -> List[Dict[str, Any]]:
     price_rows: List[Dict[str, Any]] = []
     for landed in landed_rows:
@@ -273,7 +268,6 @@ def run_calculations(
             pct_params,
             fixed_params,
             transporte,
-            data["version_id"],
         )
 
         persist_rows(
@@ -293,7 +287,6 @@ def run_calculations(
                 "gastos_aduana_mxn",
                 "landed_cost_mxn",
                 "mark_up",
-                "version_id",
                 "calculado_en",
             ],
             landed_rows,

@@ -53,19 +53,7 @@ def bool_from_str(value: Any) -> int:
     return 0
 
 
-def register_version(cursor: pyodbc.Cursor, nombre: str, descripcion: str) -> int:
-    row = cursor.execute(
-        """
-        INSERT INTO dbo.Versiones (nombre, descripcion, creado_por, fuente)
-        OUTPUT INSERTED.version_id
-        VALUES (?, ?, ?, ?)
-        """,
-        nombre,
-        descripcion,
-        "sync_excel.py",
-        "excel",
-    ).fetchone()
-    return int(row[0])
+# Función eliminada: register_version (tabla Versiones eliminada)
 
 
 def bulk_insert(
@@ -94,7 +82,7 @@ def clear_tables(cursor: pyodbc.Cursor, tables: Sequence[str]) -> None:
             pass
 
 
-def read_catalogo(ws, version_id: int) -> List[Dict[str, Any]]:
+def read_catalogo(ws) -> List[Dict[str, Any]]:
     rows = []
     # Estructura CATALOGO_PRODUCTOS: SKU, Costo_Base, Descripción, Proveedor, Model, Origen, Categoría, Unidad, Moneda_Base, Fecha_Actualización, Activo (Sí/No)
     for row_data in ws.iter_rows(min_row=2, values_only=True):
@@ -126,7 +114,6 @@ def read_catalogo(ws, version_id: int) -> List[Dict[str, Any]]:
                 "costo_base": to_decimal(costo_base),
                 "fecha_actualizacion": fecha_act.date() if hasattr(fecha_act, "date") else fecha_act,
                 "notas": None,
-                "version_id": version_id,
             }
         )
     return rows
@@ -135,7 +122,7 @@ def read_catalogo(ws, version_id: int) -> List[Dict[str, Any]]:
 # read_costos eliminada - los costos ahora están en CATALOGO_PRODUCTOS
 
 
-def read_parametros(ws, version_id: int) -> List[Dict[str, Any]]:
+def read_parametros(ws) -> List[Dict[str, Any]]:
     rows = []
     for row_data in ws.iter_rows(min_row=2, values_only=True):
         if not row_data or not row_data[0]:  # concepto
@@ -155,13 +142,12 @@ def read_parametros(ws, version_id: int) -> List[Dict[str, Any]]:
                 "notas": nota,
                 "vigente_desde": datetime.utcnow().date(),
                 "vigente_hasta": None,
-                "version_id": version_id,
             }
         )
     return rows
 
 
-def read_tipos_cambio(ws, version_id: int) -> List[Dict[str, Any]]:
+def read_tipos_cambio(ws) -> List[Dict[str, Any]]:
     rows = []
     for moneda, tc_mxn, fuente, fecha in ws.iter_rows(min_row=2, values_only=True):
         if not moneda or not tc_mxn:
@@ -173,75 +159,33 @@ def read_tipos_cambio(ws, version_id: int) -> List[Dict[str, Any]]:
                 "fecha": fecha_val,
                 "tipo_cambio_mxn": to_decimal(tc_mxn, 0.0) or 0.0,
                 "fuente": fuente or "Manual",
-                "version_id": version_id,
             }
         )
     return rows
 
 
-def read_margenes(ws, version_id: int) -> List[Dict[str, Any]]:
-    rows = []
-    for tipo_cliente, margen, notas in ws.iter_rows(min_row=2, values_only=True):
-        if not tipo_cliente or margen is None:
-            continue
-        rows.append(
-            {
-                "tipo_cliente": tipo_cliente.strip(),
-                "margen": to_decimal(margen, 0.0) or 0.0,
-                "notas": notas,
-                "vigente_desde": datetime.utcnow().date(),
-                "vigente_hasta": None,
-                "version_id": version_id,
-            }
-        )
-    return rows
-
-
-def read_control_versiones(ws) -> List[Dict[str, Any]]:
-    rows = []
-    for fecha, version, cambio, responsable in ws.iter_rows(min_row=2, values_only=True):
-        if not fecha and not version:
-            continue
-        fecha_val = fecha if fecha else datetime.utcnow()
-        rows.append(
-            {
-                "fecha": fecha_val,
-                "version": version or "",
-                "cambio": cambio or "",
-                "responsable": responsable or "",
-            }
-        )
-    return rows
+# Funciones eliminadas: read_margenes y read_control_versiones (tablas eliminadas)
 
 
 def main() -> None:
     conn_str = os.getenv("SQLSERVER_CONN", DEFAULT_CONN_STR)
     wb = load_workbook(FILE_NAME, data_only=True)
 
-    control_sheet = wb["CONTROL_VERSIONES"] if "CONTROL_VERSIONES" in wb.sheetnames else None
     sheets = {
         "catalogo": wb["CATALOGO_PRODUCTOS"],
         "parametros": wb["PARAMETROS_IMPORTACION"],
         "tipos_cambio": wb["TIPOS_CAMBIO"],
-        "margenes": wb["POLITICAS_MARGEN"] if "POLITICAS_MARGEN" in wb.sheetnames else None,
-        "control": control_sheet,
     }
 
     with pyodbc.connect(conn_str, autocommit=False) as conn:
         cursor = conn.cursor()
-        version_name = datetime.utcnow().strftime("excel-%Y%m%d-%H%M%S")
-        version_id = register_version(cursor, version_name, "Carga desde Excel piloto")
 
-        catalog_rows = read_catalogo(sheets["catalogo"], version_id)
-        param_rows = read_parametros(sheets["parametros"], version_id)
-        fx_rows = read_tipos_cambio(sheets["tipos_cambio"], version_id)
-        margin_rows = read_margenes(sheets["margenes"], version_id) if sheets["margenes"] else []
-        control_rows = read_control_versiones(sheets["control"]) if sheets["control"] else []
+        catalog_rows = read_catalogo(sheets["catalogo"])
+        param_rows = read_parametros(sheets["parametros"])
+        fx_rows = read_tipos_cambio(sheets["tipos_cambio"])
 
         clear_tables(cursor, [
             "dbo.LandedCostCache",  # Primero eliminar tablas dependientes
-            "dbo.ControlVersiones",
-            "dbo.PoliticasMargen",
             "dbo.TiposCambio",
             "dbo.ParametrosImportacion",
             "dbo.Productos",
@@ -260,7 +204,6 @@ def main() -> None:
             "costo_base",
             "fecha_actualizacion",
             "notas",
-            "version_id",
         ], catalog_rows)
 
         bulk_insert(cursor, "dbo.ParametrosImportacion", [
@@ -271,7 +214,6 @@ def main() -> None:
             "notas",
             "vigente_desde",
             "vigente_hasta",
-            "version_id",
         ], param_rows)
 
         bulk_insert(cursor, "dbo.TiposCambio", [
@@ -279,28 +221,10 @@ def main() -> None:
             "fecha",
             "tipo_cambio_mxn",
             "fuente",
-            "version_id",
         ], fx_rows)
 
-        bulk_insert(cursor, "dbo.PoliticasMargen", [
-            "tipo_cliente",
-            "margen",
-            "notas",
-            "vigente_desde",
-            "vigente_hasta",
-            "version_id",
-        ], margin_rows)
-
-        if control_rows:
-            bulk_insert(cursor, "dbo.ControlVersiones", [
-                "fecha",
-                "version",
-                "cambio",
-                "responsable",
-            ], control_rows)
-
         conn.commit()
-        print(f"Sincronización completada. Version ID: {version_id}")
+        print("Sincronización completada exitosamente")
 
 
 if __name__ == "__main__":
