@@ -20,7 +20,7 @@ DEFAULT_CONN_STR = (
     "DRIVER={ODBC Driver 18 for SQL Server};"
     "SERVER=localhost\\SQLEXPRESS;"
     "DATABASE=BD_Calculo_Costos;"
-    "UID=sa;PWD=YourStrongPassword!;"
+    "Trusted_Connection=yes;"
     "TrustServerCertificate=yes;"
 )
 
@@ -87,25 +87,44 @@ def bulk_insert(
 
 def clear_tables(cursor: pyodbc.Cursor, tables: Sequence[str]) -> None:
     for table in tables:
-        cursor.execute(f"DELETE FROM {table}")
+        try:
+            cursor.execute(f"DELETE FROM {table}")
+        except pyodbc.ProgrammingError:
+            # Tabla no existe, continuar
+            pass
 
 
 def read_catalogo(ws, version_id: int) -> List[Dict[str, Any]]:
     rows = []
-    for sku, descripcion, proveedor, modelo, origen, categoria, unidad, moneda, activo, *_ in ws.iter_rows(min_row=2, values_only=True):
-        if not sku:
+    # Estructura CATALOGO_PRODUCTOS: SKU, Costo_Base, Descripción, Proveedor, Model, Origen, Categoría, Unidad, Moneda_Base, Fecha_Actualización, Activo (Sí/No)
+    for row_data in ws.iter_rows(min_row=2, values_only=True):
+        if not row_data[0]:  # sku
             continue
+        sku = row_data[0]
+        costo_base = row_data[1] if len(row_data) > 1 else None
+        descripcion = row_data[2] if len(row_data) > 2 else ""
+        proveedor = row_data[3] if len(row_data) > 3 else None
+        modelo = row_data[4] if len(row_data) > 4 else None
+        origen = row_data[5] if len(row_data) > 5 else None
+        categoria = row_data[6] if len(row_data) > 6 else None
+        unidad = row_data[7] if len(row_data) > 7 else None
+        moneda = row_data[8] if len(row_data) > 8 else "USD"
+        fecha_act = row_data[9] if len(row_data) > 9 else None
+        activo = row_data[10] if len(row_data) > 10 else "Si"
+        
         rows.append(
             {
-                "sku": sku.strip(),
+                "sku": sku.strip() if isinstance(sku, str) else str(sku),
                 "descripcion": descripcion or "",
                 "proveedor": proveedor,
                 "modelo": modelo,
                 "origen": origen,
                 "categoria": categoria,
                 "unidad": unidad,
-                "moneda_base": (moneda or "USD").strip(),
+                "moneda_base": (moneda or "USD").strip() if isinstance(moneda, str) else "USD",
                 "activo": bool_from_str(activo),
+                "costo_base": to_decimal(costo_base),
+                "fecha_actualizacion": fecha_act.date() if hasattr(fecha_act, "date") else fecha_act,
                 "notas": None,
                 "version_id": version_id,
             }
@@ -113,30 +132,20 @@ def read_catalogo(ws, version_id: int) -> List[Dict[str, Any]]:
     return rows
 
 
-def read_costos(ws, version_id: int) -> List[Dict[str, Any]]:
-    rows = []
-    for sku, costo_base, moneda, fecha_act, notas, proveedor, *_ in ws.iter_rows(min_row=2, values_only=True):
-        if not sku:
-            continue
-        rows.append(
-            {
-                "sku": sku.strip(),
-                "costo_base": to_decimal(costo_base),
-                "moneda": (moneda or "USD").strip(),
-                "fecha_actualizacion": fecha_act.date() if hasattr(fecha_act, "date") else fecha_act,
-                "notas": notas,
-                "proveedor": proveedor,
-                "version_id": version_id,
-            }
-        )
-    return rows
+# read_costos eliminada - los costos ahora están en CATALOGO_PRODUCTOS
 
 
 def read_parametros(ws, version_id: int) -> List[Dict[str, Any]]:
     rows = []
-    for concepto, tipo, valor, descripcion, _, nota, _ in ws.iter_rows(min_row=2, values_only=True):
-        if not concepto:
+    for row_data in ws.iter_rows(min_row=2, values_only=True):
+        if not row_data or not row_data[0]:  # concepto
             continue
+        concepto = row_data[0]
+        tipo = row_data[1] if len(row_data) > 1 else None
+        valor = row_data[2] if len(row_data) > 2 else None
+        descripcion = row_data[3] if len(row_data) > 3 else None
+        nota = row_data[4] if len(row_data) > 4 else None
+        
         rows.append(
             {
                 "concepto": concepto.strip(),
@@ -212,7 +221,6 @@ def main() -> None:
     control_sheet = wb["CONTROL_VERSIONES"] if "CONTROL_VERSIONES" in wb.sheetnames else None
     sheets = {
         "catalogo": wb["CATALOGO_PRODUCTOS"],
-        "costos": wb["COSTO_BASE"],
         "parametros": wb["PARAMETROS_IMPORTACION"],
         "tipos_cambio": wb["TIPOS_CAMBIO"],
         "margenes": wb["POLITICAS_MARGEN"] if "POLITICAS_MARGEN" in wb.sheetnames else None,
@@ -225,18 +233,17 @@ def main() -> None:
         version_id = register_version(cursor, version_name, "Carga desde Excel piloto")
 
         catalog_rows = read_catalogo(sheets["catalogo"], version_id)
-        cost_rows = read_costos(sheets["costos"], version_id)
         param_rows = read_parametros(sheets["parametros"], version_id)
         fx_rows = read_tipos_cambio(sheets["tipos_cambio"], version_id)
         margin_rows = read_margenes(sheets["margenes"], version_id) if sheets["margenes"] else []
         control_rows = read_control_versiones(sheets["control"]) if sheets["control"] else []
 
         clear_tables(cursor, [
+            "dbo.LandedCostCache",  # Primero eliminar tablas dependientes
             "dbo.ControlVersiones",
             "dbo.PoliticasMargen",
             "dbo.TiposCambio",
             "dbo.ParametrosImportacion",
-            "dbo.CostosBase",
             "dbo.Productos",
         ])
 
@@ -250,19 +257,11 @@ def main() -> None:
             "unidad",
             "moneda_base",
             "activo",
+            "costo_base",
+            "fecha_actualizacion",
             "notas",
             "version_id",
         ], catalog_rows)
-
-        bulk_insert(cursor, "dbo.CostosBase", [
-            "sku",
-            "costo_base",
-            "moneda",
-            "fecha_actualizacion",
-            "notas",
-            "proveedor",
-            "version_id",
-        ], cost_rows)
 
         bulk_insert(cursor, "dbo.ParametrosImportacion", [
             "concepto",

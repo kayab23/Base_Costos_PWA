@@ -37,13 +37,10 @@ def fetch_dicts(cursor: pyodbc.Cursor, query: str) -> List[Dict[str, Any]]:
 
 def fetch_reference_data(cursor: pyodbc.Cursor) -> Dict[str, Any]:
     data = {}
+    # Ahora los costos están en la tabla Productos
     data["productos"] = fetch_dicts(
         cursor,
-        "SELECT sku, origen, moneda_base FROM dbo.Productos",
-    )
-    data["costos"] = fetch_dicts(
-        cursor,
-        "SELECT sku, costo_base, moneda, fecha_actualizacion FROM dbo.CostosBase",
+        "SELECT sku, origen, moneda_base, costo_base, fecha_actualizacion FROM dbo.Productos",
     )
     data["parametros"] = fetch_dicts(
         cursor,
@@ -136,9 +133,9 @@ def calculate_landed_costs(
     landed_rows: List[Dict[str, Any]] = []
     for producto in productos:
         sku = producto["sku"].strip()
-        cost_row = cost_map.get(sku, {})
-        costo_base = normalize_number(cost_row.get("costo_base"), 0.0)
-        moneda_costo = (cost_row.get("moneda") or producto.get("moneda_base") or "MXN").strip().upper()
+        # Los costos ahora están directamente en productos
+        costo_base = normalize_number(producto.get("costo_base"), 0.0)
+        moneda_costo = (producto.get("moneda_base") or "MXN").strip().upper()
         tc = fx_map.get(moneda_costo, 1.0)
         costo_base_mxn = costo_base * tc
 
@@ -265,13 +262,13 @@ def run_calculations(
     try:
         cursor = conn.cursor()
         data = fetch_reference_data(cursor)
-        cost_map = build_cost_map(data["costos"])
+        # Ya no necesitamos build_cost_map porque los costos están en productos
         fx_map = build_fx_map(data["tipos_cambio"])
         pct_params, fixed_params = split_parametros(data["parametros"])
 
         landed_rows = calculate_landed_costs(
             data["productos"],
-            cost_map,
+            {},  # cost_map ya no se usa
             fx_map,
             pct_params,
             fixed_params,
