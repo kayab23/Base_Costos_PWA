@@ -2,6 +2,7 @@ const state = {
     baseUrl: localStorage.getItem('apiUrl') || 'http://localhost:8000',
     auth: localStorage.getItem('authToken') || null,
     productos: [], // Cache de productos para búsqueda rápida
+    landedData: [], // Almacenar últimos resultados para descarga
 };
 
 const selectors = {
@@ -14,6 +15,7 @@ const selectors = {
     skuList: document.getElementById('sku-list'),
     skuInputsContainer: document.getElementById('sku-inputs-container'),
     clearSkusBtn: document.getElementById('clear-skus'),
+    downloadExcelBtn: document.getElementById('download-excel'),
     productDetailsCard: document.getElementById('product-details-card'),
     productDetails: document.getElementById('product-details'),
 };
@@ -132,6 +134,9 @@ async function loadLanded() {
 
         const results = await Promise.all(promises);
         const allData = results.flat();
+        
+        // Guardar datos para descarga
+        state.landedData = allData;
         
         if (allData.length === 0) {
             selectors.landedTable.innerHTML = '<tr><td colspan="5">No se encontraron resultados</td></tr>';
@@ -260,8 +265,58 @@ function formatCurrency(value) {
     });
 }
 
+function downloadExcel() {
+    if (state.landedData.length === 0) {
+        alert('No hay datos para descargar. Realiza una consulta primero.');
+        return;
+    }
+
+    // Crear CSV con formato Excel
+    const headers = ['SKU', 'Transporte', 'Origen', 'Moneda Base', 'Costo Base', 'TC MXN', 
+                     'Costo Base MXN', 'Flete %', 'Seguro %', 'Arancel %', 
+                     'Gastos Aduana MXN', 'Landed Cost MXN', 'Mark-up (10%)'];
+    
+    const rows = state.landedData.map(row => [
+        row.sku,
+        row.transporte,
+        row.origen || '',
+        row.moneda_base || '',
+        (row.costo_base ?? 0).toFixed(4),
+        (row.tc_mxn ?? 0).toFixed(4),
+        (row.costo_base_mxn ?? 0).toFixed(2),
+        ((row.flete_pct ?? 0) * 100).toFixed(2),
+        ((row.seguro_pct ?? 0) * 100).toFixed(2),
+        ((row.arancel_pct ?? 0) * 100).toFixed(2),
+        (row.gastos_aduana_mxn ?? 0).toFixed(2),
+        (row.landed_cost_mxn ?? 0).toFixed(2),
+        (row.mark_up ?? 0).toFixed(2)
+    ]);
+
+    // Generar CSV
+    const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    // Crear Blob y descargar
+    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    
+    link.setAttribute('href', url);
+    link.setAttribute('download', `Landed_Cost_${timestamp}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    selectors.status.textContent = `✅ Archivo descargado: Landed_Cost_${timestamp}.csv`;
+}
+
 // Event listeners
 selectors.clearSkusBtn.addEventListener('click', clearAllSkus);
+selectors.downloadExcelBtn.addEventListener('click', downloadExcel);
 
 // Event delegation para botones dinámicos
 selectors.skuInputsContainer.addEventListener('click', (e) => {
