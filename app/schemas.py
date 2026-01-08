@@ -15,6 +15,8 @@ class Producto(BaseModel):
     categoria: Optional[str] = None
     unidad: Optional[str] = None
     moneda_base: Optional[str] = None
+    costo_base: Optional[float] = None
+    fecha_actualizacion: Optional[date] = None
     activo: Optional[bool] = None
 
 

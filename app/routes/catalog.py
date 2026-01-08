@@ -16,7 +16,8 @@ def list_productos(conn=Depends(get_connection), user=Depends(get_current_user))
     rows = fetch_all(
         cursor,
         """
-        SELECT sku, descripcion, proveedor, origen, categoria, unidad, moneda_base, activo
+        SELECT sku, descripcion, proveedor, origen, categoria, unidad, moneda_base, 
+               costo_base, fecha_actualizacion, activo
         FROM dbo.Productos
         ORDER BY sku
         """,
@@ -24,18 +25,7 @@ def list_productos(conn=Depends(get_connection), user=Depends(get_current_user))
     return rows
 
 
-@router.get("/costos", response_model=list[schemas.CostoBase])
-def list_costos(conn=Depends(get_connection), user=Depends(get_current_user)):
-    cursor = conn.cursor()
-    rows = fetch_all(
-        cursor,
-        """
-        SELECT sku, costo_base, moneda, fecha_actualizacion, notas, proveedor
-        FROM dbo.CostosBase
-        ORDER BY sku
-        """,
-    )
-    return rows
+# Endpoint /costos eliminado - los costos ahora están en /productos (tabla Productos.costo_base)
 
 
 @router.get("/parametros", response_model=list[schemas.ParametroImportacion])
