@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routes import catalog, pricing, auth
+from .routes import catalog, pricing, auth, autorizaciones
 
 app = FastAPI(title=settings.api_title, version=settings.api_version)
 app.add_middleware(
@@ -20,6 +20,7 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(catalog.router)
 app.include_router(pricing.router)
+app.include_router(autorizaciones.router)
 
 start_time = datetime.now(timezone.utc)
 

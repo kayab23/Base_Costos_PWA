@@ -287,19 +287,54 @@ function updateUIForRole() {
         adminGerenCols.forEach(col => col.style.display = 'none');
         document.getElementById('section-title').textContent = 'Mi Lista de Precios';
         document.getElementById('section-description').textContent = 'Precios autorizados para cotización (90% a 65% sobre Mark-up)';
+        
+        // Mostrar sección de solicitud de autorización
+        document.getElementById('solicitar-autorizacion-section').style.display = 'block';
+        document.getElementById('mis-solicitudes-section').style.display = 'block';
+        document.getElementById('pendientes-section').style.display = 'none';
+        
+        loadMisSolicitudes();
     } else if (role === 'Gerencia_Comercial') {
         adminGerenCols.forEach(col => col.style.display = 'none');
         document.getElementById('section-title').textContent = 'Lista de Precios Gerencia Comercial';
         document.getElementById('section-description').textContent = 'Precios autorizados para cotización (65% a 40% sobre Mark-up)';
+        
+        // Mostrar solicitud de autorización y pendientes
+        document.getElementById('solicitar-autorizacion-section').style.display = 'block';
+        document.getElementById('mis-solicitudes-section').style.display = 'block';
+        document.getElementById('pendientes-section').style.display = 'block';
+        document.getElementById('procesadas-section').style.display = 'block';
+        
+        loadMisSolicitudes();
+        loadPendientes();
+        loadProcesadas();
     } else if (role === 'Gerencia') {
         adminGerenCols.forEach(col => col.style.display = 'table-cell');
         document.getElementById('section-title').textContent = 'Lista de Precios Gerencia';
         document.getElementById('section-description').textContent = 'Costos completos y precios autorizados (40% a 10% sobre Mark-up)';
+        
+        // Solo ver pendientes, no puede solicitar
+        document.getElementById('solicitar-autorizacion-section').style.display = 'none';
+        document.getElementById('mis-solicitudes-section').style.display = 'none';
+        document.getElementById('pendientes-section').style.display = 'block';
+        document.getElementById('procesadas-section').style.display = 'block';
+        
+        loadPendientes();
+        loadProcesadas();
     } else {
         // Admin puede ver todo
         adminGerenCols.forEach(col => col.style.display = 'table-cell');
         document.getElementById('section-title').textContent = 'Lista de Precios - Vista Administrativa';
         document.getElementById('section-description').textContent = 'Todas las listas de precios y costos completos';
+        
+        // Admin puede ver pendientes
+        document.getElementById('solicitar-autorizacion-section').style.display = 'none';
+        document.getElementById('mis-solicitudes-section').style.display = 'none';
+        document.getElementById('pendientes-section').style.display = 'block';
+        document.getElementById('procesadas-section').style.display = 'block';
+        
+        loadPendientes();
+        loadProcesadas();
     }
 }
 
@@ -501,6 +536,186 @@ document.addEventListener('click', (event) => {
         actions[action]();
     }
 });
+
+// =====================================
+// FUNCIONALIDAD DE AUTORIZACIONES
+// =====================================
+
+// Formulario de solicitud
+document.getElementById('solicitud-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const statusEl = document.getElementById('solicitud-status');
+    const data = {
+        sku: document.getElementById('sol-sku').value.trim(),
+        transporte: document.getElementById('sol-transporte').value,
+        precio_propuesto: parseFloat(document.getElementById('sol-precio').value),
+        cliente: document.getElementById('sol-cliente').value.trim() || null,
+        cantidad: parseInt(document.getElementById('sol-cantidad').value) || null,
+        justificacion: document.getElementById('sol-justificacion').value.trim()
+    };
+    
+    try {
+        statusEl.textContent = 'Enviando solicitud...';
+        statusEl.style.color = '#ffc107';
+        
+        const result = await apiFetch('/autorizaciones/solicitar', {
+            method: 'POST',
+            body: JSON.stringify(data)
+        });
+        
+        statusEl.textContent = `✅ Solicitud enviada. ID: ${result.id}`;
+        statusEl.style.color = '#4caf50';
+        
+        // Limpiar formulario
+        e.target.reset();
+        
+        // Recargar lista de mis solicitudes
+        loadMisSolicitudes();
+    } catch (error) {
+        statusEl.textContent = `❌ Error: ${error.message}`;
+        statusEl.style.color = '#f44336';
+    }
+});
+
+// Cargar solicitudes pendientes
+async function loadPendientes() {
+    try {
+        const solicitudes = await apiFetch('/autorizaciones/pendientes');
+        const tbody = document.querySelector('#pendientes-table tbody');
+        
+        if (!solicitudes || solicitudes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="11" style="text-align:center; color: var(--muted);">No hay solicitudes pendientes</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = solicitudes.map(s => `
+            <tr>
+                <td>${s.solicitante || 'N/A'}</td>
+                <td>${s.sku}</td>
+                <td>${s.transporte}</td>
+                <td>$${s.precio_minimo_actual.toLocaleString('es-MX', {minimumFractionDigits: 2})}</td>
+                <td>$${s.precio_propuesto.toLocaleString('es-MX', {minimumFractionDigits: 2})}</td>
+                <td>${s.descuento_adicional_pct.toFixed(2)}%</td>
+                <td>${s.cliente || '-'}</td>
+                <td>${s.cantidad || '-'}</td>
+                <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${s.justificacion}">${s.justificacion}</td>
+                <td>${new Date(s.fecha_solicitud).toLocaleDateString('es-MX')}</td>
+                <td class="action-buttons">
+                    <button class="btn-aprobar" onclick="aprobarSolicitud(${s.id})">✓ Aprobar</button>
+                    <button class="btn-rechazar" onclick="rechazarSolicitud(${s.id})">✗ Rechazar</button>
+                </td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        console.error('Error cargando pendientes:', error);
+    }
+}
+
+// Cargar mis solicitudes
+async function loadMisSolicitudes() {
+    try {
+        const solicitudes = await apiFetch('/autorizaciones/mis-solicitudes');
+        const tbody = document.querySelector('#mis-solicitudes-table tbody');
+        
+        if (!solicitudes || solicitudes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: var(--muted);">No has creado solicitudes</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = solicitudes.map(s => `
+            <tr>
+                <td>${s.sku}</td>
+                <td>${s.transporte}</td>
+                <td>$${s.precio_propuesto.toLocaleString('es-MX', {minimumFractionDigits: 2})}</td>
+                <td>${s.cliente || '-'}</td>
+                <td class="estado-${s.estado.toLowerCase()}">${s.estado}</td>
+                <td>${s.autorizador || '-'}</td>
+                <td>${new Date(s.fecha_solicitud).toLocaleDateString('es-MX')}</td>
+                <td>${s.fecha_respuesta ? new Date(s.fecha_respuesta).toLocaleDateString('es-MX') : '-'}</td>
+                <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${s.comentarios_autorizador || ''}">${s.comentarios_autorizador || '-'}</td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        console.error('Error cargando mis solicitudes:', error);
+    }
+}
+
+// Cargar solicitudes procesadas (aprobadas o rechazadas por el usuario)
+async function loadProcesadas() {
+    try {
+        const solicitudes = await apiFetch('/autorizaciones/procesadas');
+        const tbody = document.querySelector('#procesadas-table tbody');
+        
+        if (!solicitudes || solicitudes.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: var(--muted);">No has procesado solicitudes</td></tr>';
+            return;
+        }
+        
+        tbody.innerHTML = solicitudes.map(s => `
+            <tr>
+                <td>${s.solicitante || 'N/A'}</td>
+                <td>${s.sku}</td>
+                <td>${s.transporte}</td>
+                <td>$${s.precio_propuesto.toLocaleString('es-MX', {minimumFractionDigits: 2})}</td>
+                <td>${s.cliente || '-'}</td>
+                <td class="estado-${s.estado.toLowerCase()}">${s.estado}</td>
+                <td>${new Date(s.fecha_solicitud).toLocaleDateString('es-MX')}</td>
+                <td>${s.fecha_respuesta ? new Date(s.fecha_respuesta).toLocaleDateString('es-MX') : '-'}</td>
+                <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;" title="${s.comentarios_autorizador || ''}">${s.comentarios_autorizador || '-'}</td>
+            </tr>
+        `).join('');
+    } catch (error) {
+        console.error('Error cargando solicitudes procesadas:', error);
+    }
+}
+
+// Aprobar solicitud
+async function aprobarSolicitud(id) {
+    const comentarios = prompt('Comentarios (opcional):');
+    if (comentarios === null) return; // Usuario canceló
+    
+    try {
+        await apiFetch(`/autorizaciones/${id}/aprobar`, {
+            method: 'PUT',
+            body: JSON.stringify({ comentarios })
+        });
+        
+        alert('✅ Solicitud aprobada');
+        loadPendientes();
+        loadProcesadas();
+    } catch (error) {
+        alert(`❌ Error: ${error.message}`);
+    }
+}
+
+// Rechazar solicitud
+async function rechazarSolicitud(id) {
+    const comentarios = prompt('Motivo del rechazo (opcional):');
+    if (comentarios === null) return; // Usuario canceló
+    
+    try {
+        await apiFetch(`/autorizaciones/${id}/rechazar`, {
+            method: 'PUT',
+            body: JSON.stringify({ comentarios })
+        });
+        
+        alert('❌ Solicitud rechazada');
+        loadPendientes();
+        loadProcesadas();
+    } catch (error) {
+        alert(`❌ Error: ${error.message}`);
+    }
+}
+
+// Exponer funciones globalmente
+window.aprobarSolicitud = aprobarSolicitud;
+window.rechazarSolicitud = rechazarSolicitud;
+
+// Botones de actualizar
+document.getElementById('refresh-pendientes')?.addEventListener('click', loadPendientes);
+document.getElementById('refresh-procesadas')?.addEventListener('click', loadProcesadas);
+document.getElementById('refresh-mis-solicitudes')?.addEventListener('click', loadMisSolicitudes);
 
 if (state.auth) {
     loadProductos();

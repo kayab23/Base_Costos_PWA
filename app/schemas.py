@@ -7,6 +7,12 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
+class UserInfo(BaseModel):
+    usuario_id: int
+    username: str
+    rol: str
+
+
 class Producto(BaseModel):
     sku: str
     descripcion: Optional[str] = None
@@ -114,3 +120,40 @@ class ListaPrecio(BaseModel):
     arancel_pct: Optional[float]
     dta_pct: Optional[float]
     honorarios_aduanales_pct: Optional[float]
+
+
+class SolicitudAutorizacionCreate(BaseModel):
+    """Schema para crear solicitud de autorización"""
+    sku: str
+    transporte: str
+    precio_propuesto: float
+    cliente: Optional[str] = None
+    cantidad: Optional[int] = None
+    justificacion: str
+
+
+class SolicitudAutorizacionResponse(BaseModel):
+    """Schema para aprobar/rechazar solicitud"""
+    comentarios: Optional[str] = None
+
+
+class SolicitudAutorizacion(BaseModel):
+    """Schema para solicitud de autorización"""
+    id: int
+    sku: str
+    transporte: str
+    solicitante_id: int
+    solicitante: Optional[str]
+    nivel_solicitante: str
+    precio_propuesto: float
+    precio_minimo_actual: float
+    descuento_adicional_pct: float
+    cliente: Optional[str]
+    cantidad: Optional[int]
+    justificacion: str
+    estado: str
+    autorizador_id: Optional[int]
+    autorizador: Optional[str]
+    fecha_solicitud: datetime
+    fecha_respuesta: Optional[datetime]
+    comentarios_autorizador: Optional[str]

@@ -97,6 +97,137 @@
                 <!-- Se llenará dinámicamente con JavaScript -->
             </div>
         </section>
+
+        <!-- Sección para solicitar autorizaciones (Vendedores y Gerencia Comercial) -->
+        <section class="card" id="solicitar-autorizacion-section" style="display: none;">
+            <header>
+                <h3>Solicitar Autorización de Descuento</h3>
+                <p>Solicita aprobación para ofrecer un precio por debajo de tu límite autorizado</p>
+            </header>
+            <form id="solicitud-form">
+                <div class="form-group">
+                    <label>SKU*
+                        <input type="text" id="sol-sku" list="sku-list" required>
+                    </label>
+                    <label>Transporte*
+                        <select id="sol-transporte" required>
+                            <option value="">Seleccione...</option>
+                            <option value="Maritimo">Marítimo</option>
+                            <option value="Aereo">Aéreo</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Precio Propuesto (MXN)*
+                        <input type="number" id="sol-precio" step="0.01" min="0" required>
+                    </label>
+                    <label>Cliente
+                        <input type="text" id="sol-cliente">
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Cantidad
+                        <input type="number" id="sol-cantidad" min="1">
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Justificación*
+                        <textarea id="sol-justificacion" rows="3" required placeholder="Explique por qué necesita este descuento adicional..."></textarea>
+                    </label>
+                </div>
+                <button type="submit" class="primary">Enviar Solicitud</button>
+                <p id="solicitud-status" class="status"></p>
+            </form>
+        </section>
+
+        <!-- Sección para ver solicitudes pendientes (Gerencia Comercial y Gerencia) -->
+        <section class="card" id="pendientes-section" style="display: none;">
+            <header>
+                <div>
+                    <h3>Solicitudes Pendientes de Autorización</h3>
+                    <p>Revisa y aprueba solicitudes de descuentos adicionales</p>
+                </div>
+                <button class="ghost" id="refresh-pendientes">🔄 Actualizar</button>
+            </header>
+            <div class="table-wrapper">
+                <table id="pendientes-table">
+                    <thead>
+                        <tr>
+                            <th>Solicitante</th>
+                            <th>SKU</th>
+                            <th>Transporte</th>
+                            <th>Precio Actual</th>
+                            <th>Precio Propuesto</th>
+                            <th>Descuento %</th>
+                            <th>Cliente</th>
+                            <th>Cant.</th>
+                            <th>Justificación</th>
+                            <th>Fecha</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Sección para ver historial de aprobaciones (Gerencia Comercial y Gerencia) -->
+        <section class="card" id="procesadas-section" style="display: none;">
+            <header>
+                <div>
+                    <h3>Historial de Aprobaciones</h3>
+                    <p>Solicitudes que has aprobado o rechazado</p>
+                </div>
+                <button class="ghost" id="refresh-procesadas">🔄 Actualizar</button>
+            </header>
+            <div class="table-wrapper">
+                <table id="procesadas-table">
+                    <thead>
+                        <tr>
+                            <th>Solicitante</th>
+                            <th>SKU</th>
+                            <th>Transporte</th>
+                            <th>Precio Propuesto</th>
+                            <th>Cliente</th>
+                            <th>Estado</th>
+                            <th>Fecha Solicitud</th>
+                            <th>Fecha Respuesta</th>
+                            <th>Tus Comentarios</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Sección para ver mis solicitudes -->
+        <section class="card" id="mis-solicitudes-section" style="display: none;">
+            <header>
+                <div>
+                    <h3>Mis Solicitudes de Autorización</h3>
+                    <p>Historial de solicitudes creadas</p>
+                </div>
+                <button class="ghost" id="refresh-mis-solicitudes">🔄 Actualizar</button>
+            </header>
+            <div class="table-wrapper">
+                <table id="mis-solicitudes-table">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Transporte</th>
+                            <th>Precio Propuesto</th>
+                            <th>Cliente</th>
+                            <th>Estado</th>
+                            <th>Autorizador</th>
+                            <th>Fecha Solicitud</th>
+                            <th>Fecha Respuesta</th>
+                            <th>Comentarios</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
     </main>
 
     <script src="app.js" type="module"></script>
