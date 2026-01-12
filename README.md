@@ -1,123 +1,171 @@
 # Base Costos PWA Pilot
 
-Documenta el pipeline completo del piloto para calcular landed cost y publicar precios desde SQL Server, exponerlos mediante FastAPI y consultarlos con una PWA ligera.
+Sistema de cálculo de Landed Cost y pricing para importaciones, con interfaz PWA para consultas en tiempo real.
 
-## Arquitectura en 60 segundos
+## Arquitectura
 
 ```
 Excel (Plantilla_Pricing_Costos_Importacion.xlsx)
     │
-    ├─ sync_excel.py           → Llena tablas base y crea una versión
-    ├─ cost_engine.py          → Calcula LandedCostCache + ListaPrecios
-    └─ app/ (FastAPI)          → Expone catálogos, cálculos y recálculo
+    ├─ sync_excel.py           → Sincroniza catálogo y parámetros
+    ├─ cost_engine.py          → Calcula LandedCostCache
+    └─ app/ (FastAPI)          → API REST con autenticación
             ↑
 frontend/ PWA (fetch + Basic Auth) ↔ /catalog, /pricing, /health
 ```
 
-Componentes físicos:
-- **SQL Server Express** con la base `BD_Calculo_Costos`. El esquema completo está en `sql/schema.sql` y el parche incremental para usuarios en `sql/add_usuarios_table.sql`.
-- **Motor de sincronización** `sync_excel.py` que limpia tablas operativas y reimporta desde la plantilla Excel (requieres `openpyxl`).
-- **Motor de cálculo** `cost_engine.py` que genera y persiste landed cost y precios (invocado manualmente o vía `/pricing/recalculate`).
-- **Backend FastAPI** bajo `app/` con autenticación básica y rutas para catálogos/pricing.
-- **Herramientas auxiliares** (`manage_users.py`, `inspect_workbook.py`) para crear usuarios y explorar hojas Excel.
-- **Frontend PWA** en `frontend/` que actúa como consola de operador y cachea recursos vía Service Worker.
+Componentes:
+- **SQL Server Express** con base `BD_Calculo_Costos` (5 tablas principales)
+- **Motor de sincronización** `sync_excel.py` importa desde Excel
+- **Motor de cálculo** `cost_engine.py` genera landed costs con nueva fórmula
+- **Backend FastAPI** en `app/` con autenticación básica
+- **Frontend PWA** en `frontend/` con Service Worker para offline
 
-## Requisitos previos
 
-1. **Python 3.11+** con acceso al archivo `requirements.txt`. Usa entorno virtual: `py -3.11 -m venv .venv` y actívalo antes de instalar dependencias.
-2. **ODBC Driver 18** para SQL Server y conectividad local a `localhost` o `.\\SQLEXPRESS`.
-3. **SQL Server Express** (o equivalente) con una base en blanco y permisos para crear tablas, vistas y usuarios.
-4. **Node.js / npm** (opcional) para servir la PWA o usa `python -m http.server 5173` desde `frontend/`.
-5. **Git 2.52+** ya instalado (ruta `C:\Program Files\Git\cmd`). Si la terminal no lo reconoce, abrir una nueva sesión tras ejecutar `setx PATH` como hicimos hoy.
+## Requisitos
 
-Variables relevantes:
-- `SQLSERVER_CONN`: cadena completa de conexión. Si no está definida, `cost_engine.py`, `app/config.py` y `manage_users.py` usan `DRIVER={ODBC Driver 18 for SQL Server};SERVER=.\SQLEXPRESS;DATABASE=BD_Calculo_Costos;Trusted_Connection=yes;TrustServerCertificate=yes;`.
+1. **Python 3.11+** con entorno virtual
+2. **ODBC Driver 18** para SQL Server
+3. **SQL Server Express** con base `BD_Calculo_Costos`
+4. Dependencias: `pip install -r requirements.txt`
 
-## Inicialización de datos
+## Estructura de Base de Datos
 
-1. Ejecuta `sql/schema.sql` en `BD_Calculo_Costos` para crear todas las tablas (Versiones, Productos, CostosBase, ParametrosImportacion, TiposCambio, PoliticasMargen, LandedCostCache, ListaPrecios, ControlVersiones, Usuarios).
-2. (Opcional) Si el esquema ya existe pero falta la tabla de usuarios, aplica `sql/add_usuarios_table.sql`.
-3. Coloca/actualiza la plantilla `Plantilla_Pricing_Costos_Importacion.xlsx` en la raíz del proyecto.
-4. Corre `python sync_excel.py` (usa `SQLSERVER_CONN` si necesitas otra instancia). El script:
-   - Registra una nueva fila en `Versiones`.
-   - Limpia tablas operativas con `DELETE`.
-   - Inserta catálogos, costos, parámetros, tipos de cambio, márgenes y control de versiones.
+**Tablas principales:**
+- `Productos` (427 SKUs): catálogo con costos base
+- `ParametrosImportacion` (7 parámetros): Maritimo, Aereo, Arancel, Seguro, DTA, Honorarios_Aduanales, Mark_up
+- `TiposCambio` (4 monedas): tipos de cambio a MXN
+- `LandedCostCache` (854 registros): resultados de cálculos
+- `Usuarios`: autenticación con bcrypt
 
-## Motor de cálculo (`cost_engine.py`)
+**Tablas eliminadas (limpieza 2026-01-08):**
+- ~~Versiones~~ - Sistema de versionamiento removido
+- ~~PoliticasMargen~~ - Vacía, sin uso
+- ~~ControlVersiones~~ - Vacía, sin uso
 
-- Implementa utilidades para normalizar números, construir mapas de costos/FX y separar parámetros fijos vs porcentuales.
-- Calcula landed cost según origen, transporte y parámetros de importación, aplicando seguros, fletes, aranceles y gastos fijos.
-- Construye listas de precio por tipo de cliente y monedas destino, imponiendo `PRICE_MIN_MULTIPLIER = 1.10` como piso.
-- Persiste resultados limpiando `dbo.LandedCostCache` y `dbo.ListaPrecios` antes de insertar nuevos registros.
-- CLI: `python cost_engine.py --transporte Maritimo --moneda-precio MXN --moneda-precio USD`.
+## Fórmula de Cálculo (Actualizada 2026-01-12)
 
-## Backend FastAPI (`app/`)
-
-- `app/main.py`: crea la instancia, configura CORS (orígenes `http://localhost:5173` y `http://127.0.0.1:5173`) y publica `/health`.
-- `app/config.py`: centraliza settings (cadena SQL, transporte y monedas por defecto, metadatos de API).
-- `app/db.py`: helpers para conexiones y selección de filas.
-- `app/security.py`: hashing/verificación bcrypt con parche para passlib + bcrypt 4.
-- `app/auth.py`: dependencia `get_current_user()` que valida credenciales HTTP Basic contra `dbo.Usuarios`.
-- `app/routes/catalog.py`: endpoints `/catalog/*` para productos, costos, parámetros, tipos de cambio y márgenes (todos protegidos).
-- `app/routes/pricing.py`: entrega landed cost y lista de precios, además de `POST /pricing/recalculate` que invoca `run_calculations()` reutilizando la conexión abierta.
-- `app/schemas.py`: modelos Pydantic para respuestas/solicitudes.
-
-### Ejecución local
-
-```bash
-(.venv) uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+**Landed Cost para productos importados:**
+```
+Landed Cost = Costo_Base_MXN × (1 + Flete% + Seguro% + Arancel% + DTA% + Honorarios_Aduanales%)
 ```
 
-Con Basic Auth, crea al menos un usuario:
-
-```bash
-(.venv) python manage_users.py create --username admin --password Admin123! --rol admin
+**Mark-up (10% sobre Landed Cost):**
+```
+Mark-up = Landed Cost × 1.10
 ```
 
-> **Nota temporal**: las contraseñas se almacenan con bcrypt pero el transporte no es TLS. En escenarios reales usa HTTPS y un proveedor de identidad más robusto.
+**Parámetros actuales:**
+- Flete Marítimo: 30%
+- Flete Aéreo: 120%
+- Seguro: 0.6%
+- Arancel: 5%
+- DTA: 0.8%
+- Honorarios Aduanales: 0.45%
+- Mark-up: 10%
 
-## Frontend PWA (`frontend/`)
+## Uso Rápido
 
-- `index.html`: landing con tarjeta de autenticación, tablas para productos y landed cost, y formulario para recalcular.
-- `app.js`: maneja estado en `localStorage`, construye cabecera Basic Auth y consume `/health`, `/catalog/productos`, `/pricing/landed`, `/pricing/recalculate`. Limita la renderización a 25 filas para mantener el layout.
-- `styles.css`: diseño tipo "glass" con la fuente Space Grotesk y soporte responsivo.
-- `sw.js` + `manifest.webmanifest`: Service Worker cache-first y metadatos PWA (icons en `frontend/icons/`).
-
-Servir en local:
-
+**1. Sincronizar Excel:**
 ```bash
-# opción 1
-(.venv) python -m http.server 5173 --directory frontend
-# opción 2
-npx serve frontend
+python sync_excel.py
 ```
 
-Luego abre `http://localhost:5173`, ingresa la URL del backend (`http://localhost:8000` por defecto) y credenciales creadas con `manage_users.py`.
+**2. Calcular Landed Costs:**
+```bash
+python cost_engine.py --transporte Maritimo
+python cost_engine.py --transporte Aereo
+```
 
-## Herramientas auxiliares
+**3. Iniciar Backend:**
+```bash
+uvicorn app.main:app --host 0.0.0.0 --port 8000
+```
 
-- `inspect_workbook.py`: imprime dimensiones, encabezados, muestras de filas y fórmulas por hoja para depurar inconsistencias en la plantilla Excel.
-- Carpeta `Lib/site-packages`: entorno autónomo con dependencias (openpyxl, pyodbc, etc.) preinstaladas para ejecutar scripts aunque no se active `.venv`. Mantenerla sincronizada si actualizas dependencias.
-- `Scripts/`: binarios del entorno virtual (Windows) utilizados por `python`, `pip`, `uvicorn`, etc.
+**4. Iniciar Frontend:**
+```bash
+cd frontend
+python -m http.server 5173
+```
 
-## Flujo operativo recomendado
+**5. Crear Usuario:**
+```bash
+python manage_users.py create --username admin --password Admin123! --rol admin
+```
 
-1. **Sincronizar Excel → SQL** con `python sync_excel.py` cuando recibas una nueva versión de la plantilla.
-2. **Ejecutar cálculos** (manual o via `POST /pricing/recalculate`).
-3. **Validar catálogos/costeo** usando `/catalog/*` y `/pricing/*` desde la PWA o herramientas externas.
-4. **Compartir resultados** exportando desde `dbo.ListaPrecios` o mostrando la PWA en tablets/desktop.
+## API Endpoints
 
-## Elementos temporales y pendientes
+- `GET /health` - Estado del servidor
+- `GET /catalog/productos` - Catálogo completo (requiere auth)
+- `GET /pricing/landed?sku={sku}&transporte={transporte}` - Consultar landed cost
+- `POST /pricing/recalculate` - Recalcular todos los costos
 
-- PWA usa Basic Auth almacenado en `localStorage`. Migrar a tokens cortos o OAuth cuando se exponga públicamente.
-- Los íconos bajo `frontend/icons/` son placeholders documentados en `frontend/icons/README.txt`; reemplazarlos antes de empaquetar.
-- El motor elimina completamente las tablas `LandedCostCache` y `ListaPrecios` antes de insertar; si se requiere histórico debe añadir versionamiento.
-- No existen pruebas automatizadas; ejecutar `sync_excel.py` y `cost_engine.py` manualmente después de cada cambio mayor.
-- Git se instaló hoy pero la terminal actual no refresca PATH automáticamente; abrir un shell nuevo antes de correr `git --version`.
+## Frontend PWA
 
-## Próximos pasos sugeridos
+**Características:**
+- Consulta de landed costs en tiempo real
+- Filtro por SKU y tipo de transporte
+- Exportación a Excel (CSV con UTF-8 BOM)
+- Visualización de 10 columnas: SKU, Transporte, Costo Base, Flete%, Seguro%, Arancel%, DTA%, Hon. Aduanales%, Landed Cost, Mark-up
+- Service Worker para funcionamiento offline
+- Autenticación Basic Auth
 
-1. Inicializar el repositorio Git local (`git init`, `.gitignore` para `.venv/`, `Lib/`, etc.).
-2. Crear commits documentando sincronización/calculadora/PWA y empujar a `https://github.com/kayab23/Base_Costos_PWA.git`.
-3. Definir pipeline de despliegue (por ejemplo, contenedor con FastAPI + reverse proxy y hosting estático para la PWA).
-4. Extender documentación con diagramas y ejemplos de API (FastAPI genera `/docs` automáticamente una vez en ejecución).
+**Acceso:**
+1. Abrir http://localhost:5173
+2. Ingresar credenciales
+3. Buscar SKUs y consultar costos
+4. Descargar resultados a Excel
+
+## Cambios Recientes (2026-01-12)
+
+### Base de Datos
+- ✅ Agregadas columnas `dta_pct` y `honorarios_aduanales_pct` a LandedCostCache
+- ✅ Eliminado concepto de `gastos_aduana_fijo` (obsoleto)
+
+### Motor de Cálculo
+- ✅ Corregida fórmula: eliminada suma de gastos fijos
+- ✅ Nueva fórmula alineada 100% con Excel
+- ✅ Recalculados 854 registros (427 Marítimo + 427 Aéreo)
+
+### API y Schemas
+- ✅ Agregados campos `dta_pct` y `honorarios_aduanales_pct` a LandedCost schema
+- ✅ Actualizada query SQL en pricing.py
+- ✅ Eliminado campo `gastos_aduana_mxn` de exportación
+
+### Frontend
+- ✅ Tabla expandida de 5 a 10 columnas
+- ✅ Agregada función `formatPercentage()` para mostrar porcentajes
+- ✅ Exportación Excel actualizada con 14 columnas
+- ✅ Valores mostrados coinciden exactamente con Excel
+
+## Git y Control de Versiones
+
+**Commits principales:**
+- `0381f2d` - Fix: Eliminar referencias a version_id
+- `4cab3ec` - Database cleanup: Eliminadas tablas obsoletas
+- `4c62331` - Excel template added
+- `51dd852` - Excel export feature
+
+**Archivos ignorados (.gitignore):**
+- `.venv/`, `Lib/`, `Scripts/` - Entorno virtual
+- `__pycache__/` - Cachés de Python
+- `check_*.py`, `fix_*.py`, `test_*.py`, `verify_*.py` - Scripts temporales
+- `~$*.xlsx` - Archivos temporales de Excel
+
+## Notas Técnicas
+
+- Backend usa autenticación Basic Auth (migrar a JWT para producción)
+- Frontend almacena credenciales en localStorage (considerar sessionStorage)
+- Valores en base de datos: porcentajes como decimales (0.30 = 30%)
+- Excel: fórmulas con XLOOKUP requieren Excel 2019+
+- Python warning "Could not find platform independent libraries" es no-crítico
+
+## Próximos Pasos
+
+1. ~~Sincronizar nuevos parámetros desde Excel~~ ✅
+2. ~~Actualizar lógica de cálculo~~ ✅
+3. ~~Validar resultados vs Excel~~ ✅
+4. Agregar tests automatizados
+5. Implementar JWT para autenticación
+6. Dockerizar aplicación
+7. CI/CD con GitHub Actions

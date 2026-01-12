@@ -123,8 +123,8 @@ def calculate_landed_costs(
     flete_pct = pct_params.get(transporte_key, 0.0)
     seguro_pct = pct_params.get("seguro", 0.0)
     arancel_pct = pct_params.get("arancel", 0.0)
-    gastos_aduana_pct = pct_params.get("gastos_aduana", 0.0)
-    gastos_aduana_fijo = fixed_params.get("gastos_aduana", 0.0)
+    dta_pct = pct_params.get("dta", 0.0)
+    honorarios_aduanales_pct = pct_params.get("honorarios_aduanales", 0.0)
     markup_pct = pct_params.get("mark_up", 0.1)  # 10% por defecto
 
     landed_rows: List[Dict[str, Any]] = []
@@ -138,8 +138,8 @@ def calculate_landed_costs(
 
         origen = (producto.get("origen") or "").strip().lower()
         if origen == "importado":
-            # Fórmula corregida: Gastos_Aduana como porcentaje sumado con los demás
-            landed = costo_base_mxn * (1 + flete_pct + seguro_pct + arancel_pct + gastos_aduana_pct) + gastos_aduana_fijo
+            # Fórmula Excel: Costo_Base_MXN × (1 + Flete% + Seguro% + Arancel% + DTA% + Honorarios_Aduanales%)
+            landed = costo_base_mxn * (1 + flete_pct + seguro_pct + arancel_pct + dta_pct + honorarios_aduanales_pct)
         else:
             landed = costo_base_mxn
         
@@ -158,7 +158,9 @@ def calculate_landed_costs(
                 "flete_pct": flete_pct,
                 "seguro_pct": seguro_pct,
                 "arancel_pct": arancel_pct,
-                "gastos_aduana_mxn": costo_base_mxn * gastos_aduana_pct + gastos_aduana_fijo,
+                "dta_pct": dta_pct,
+                "honorarios_aduanales_pct": honorarios_aduanales_pct,
+                "gastos_aduana_mxn": 0.0,  # Ya no se usa este concepto
                 "landed_cost_mxn": landed,
                 "mark_up": mark_up,
                 "calculado_en": datetime.now(timezone.utc),
@@ -284,6 +286,8 @@ def run_calculations(
                 "flete_pct",
                 "seguro_pct",
                 "arancel_pct",
+                "dta_pct",
+                "honorarios_aduanales_pct",
                 "gastos_aduana_mxn",
                 "landed_cost_mxn",
                 "mark_up",

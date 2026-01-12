@@ -61,6 +61,8 @@ class LandedCost(BaseModel):
     flete_pct: Optional[float]
     seguro_pct: Optional[float]
     arancel_pct: Optional[float]
+    dta_pct: Optional[float]
+    honorarios_aduanales_pct: Optional[float]
     gastos_aduana_mxn: Optional[float]
     landed_cost_mxn: Optional[float]
     mark_up: Optional[float]

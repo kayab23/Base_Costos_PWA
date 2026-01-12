@@ -22,8 +22,8 @@ def list_landed_cost(
     cursor = conn.cursor()
     query = """
         SELECT sku, transporte, origen, moneda_base, costo_base, tc_mxn, costo_base_mxn,
-               flete_pct, seguro_pct, arancel_pct, gastos_aduana_mxn, landed_cost_mxn, mark_up,
-               calculado_en
+               flete_pct, seguro_pct, arancel_pct, dta_pct, honorarios_aduanales_pct,
+               gastos_aduana_mxn, landed_cost_mxn, mark_up, calculado_en
         FROM dbo.LandedCostCache
         WHERE 1=1
     """

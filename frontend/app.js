@@ -117,7 +117,7 @@ async function loadLanded() {
             .filter(q => q.sku);
         
         if (skuQueries.length === 0) {
-            selectors.landedTable.innerHTML = '<tr><td colspan="5">Ingrese al menos un SKU para consultar</td></tr>';
+            selectors.landedTable.innerHTML = '<tr><td colspan="10">Ingrese al menos un SKU para consultar</td></tr>';
             hideProductDetails();
             return;
         }
@@ -139,7 +139,7 @@ async function loadLanded() {
         state.landedData = allData;
         
         if (allData.length === 0) {
-            selectors.landedTable.innerHTML = '<tr><td colspan="5">No se encontraron resultados</td></tr>';
+            selectors.landedTable.innerHTML = '<tr><td colspan="10">No se encontraron resultados</td></tr>';
             hideProductDetails();
             return;
         }
@@ -152,6 +152,11 @@ async function loadLanded() {
                     <td>${row.sku}</td>
                     <td>${row.transporte}</td>
                     <td>${formatCurrency(row.costo_base_mxn)}</td>
+                    <td>${formatPercentage(row.flete_pct)}</td>
+                    <td>${formatPercentage(row.seguro_pct)}</td>
+                    <td>${formatPercentage(row.arancel_pct)}</td>
+                    <td>${formatPercentage(row.dta_pct)}</td>
+                    <td>${formatPercentage(row.honorarios_aduanales_pct)}</td>
                     <td>${formatCurrency(row.landed_cost_mxn)}</td>
                     <td>${formatCurrency(row.mark_up)}</td>
                 </tr>`
@@ -265,6 +270,11 @@ function formatCurrency(value) {
     });
 }
 
+function formatPercentage(value) {
+    const pct = (value ?? 0) * 100;
+    return pct.toFixed(2) + '%';
+}
+
 function downloadExcel() {
     if (state.landedData.length === 0) {
         alert('No hay datos para descargar. Realiza una consulta primero.');
@@ -273,8 +283,8 @@ function downloadExcel() {
 
     // Crear CSV con formato Excel
     const headers = ['SKU', 'Transporte', 'Origen', 'Moneda Base', 'Costo Base', 'TC MXN', 
-                     'Costo Base MXN', 'Flete %', 'Seguro %', 'Arancel %', 
-                     'Gastos Aduana MXN', 'Landed Cost MXN', 'Mark-up (10%)'];
+                     'Costo Base MXN', 'Flete %', 'Seguro %', 'Arancel %', 'DTA %', 'Hon. Aduanales %',
+                     'Landed Cost MXN', 'Mark-up (10%)'];
     
     const rows = state.landedData.map(row => [
         row.sku,
@@ -287,7 +297,8 @@ function downloadExcel() {
         ((row.flete_pct ?? 0) * 100).toFixed(2),
         ((row.seguro_pct ?? 0) * 100).toFixed(2),
         ((row.arancel_pct ?? 0) * 100).toFixed(2),
-        (row.gastos_aduana_mxn ?? 0).toFixed(2),
+        ((row.dta_pct ?? 0) * 100).toFixed(2),
+        ((row.honorarios_aduanales_pct ?? 0) * 100).toFixed(2),
         (row.landed_cost_mxn ?? 0).toFixed(2),
         (row.mark_up ?? 0).toFixed(2)
     ]);
