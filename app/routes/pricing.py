@@ -74,3 +74,40 @@ def recalculate_pricing(
     monedas = payload.monedas or settings.default_monedas
     summary = run_calculations(transporte, monedas, conn)
     return summary
+
+
+@router.get("/listas", response_model=list[schemas.ListaPrecio])
+def get_listas_precios(
+    sku: str | None = Query(default=None, description="Filtra por SKU"),
+    transporte: str | None = Query(default=None, description="Filtra por Transporte (Maritimo/Aereo)"),
+    conn=Depends(get_connection),
+    user=Depends(get_current_user),
+):
+    """
+    Obtiene las listas de precios calculadas con rangos por jerarquía:
+    - Vendedor: 90% a 65% sobre Mark-up
+    - Gerencia Comercial: 65% a 40% sobre Mark-up
+    - Gerencia: 40% a 10% sobre Mark-up
+    """
+    cursor = conn.cursor()
+    query = """
+        SELECT p.sku, p.transporte, p.landed_cost_mxn, p.precio_base_mxn,
+               p.precio_vendedor_max, p.precio_vendedor_min,
+               p.precio_gerencia_com_max, p.precio_gerencia_com_min,
+               p.precio_gerencia_max, p.precio_gerencia_min,
+               p.markup_pct, p.fecha_calculo,
+               l.costo_base_mxn, l.flete_pct, l.seguro_pct, l.arancel_pct,
+               l.dta_pct, l.honorarios_aduanales_pct
+        FROM dbo.PreciosCalculados p
+        LEFT JOIN dbo.LandedCostCache l ON p.sku = l.sku AND p.transporte = l.transporte
+        WHERE 1=1
+    """
+    params: list[str] = []
+    if sku:
+        query += " AND p.sku = ?"
+        params.append(sku)
+    if transporte:
+        query += " AND p.transporte = ?"
+        params.append(transporte)
+    query += " ORDER BY p.sku, p.transporte"
+    return fetch_all(cursor, query, params)

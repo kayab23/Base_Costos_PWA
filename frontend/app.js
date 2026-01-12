@@ -1,6 +1,7 @@
 const state = {
     baseUrl: localStorage.getItem('apiUrl') || 'http://localhost:8000',
     auth: localStorage.getItem('authToken') || null,
+    userRole: localStorage.getItem('userRole') || null, // Nuevo: almacenar rol
     productos: [], // Cache de productos para búsqueda rápida
     landedData: [], // Almacenar últimos resultados para descarga
 };
@@ -10,6 +11,7 @@ const selectors = {
     username: document.getElementById('username'),
     password: document.getElementById('password'),
     status: document.getElementById('status-msg'),
+    userRole: document.getElementById('user-role'), // Nuevo: elemento para mostrar rol
     connectBtn: document.getElementById('connect-btn'),
     landedTable: document.querySelector('#landed-table tbody'),
     skuList: document.getElementById('sku-list'),
@@ -70,21 +72,34 @@ selectors.connectBtn.addEventListener('click', async () => {
             throw new Error('No se puede conectar al servidor');
         }
         
-        // Luego intentar autenticar
+        // Luego intentar autenticar y obtener datos de usuario
         console.log('Cargando productos...');
         await loadProductos();
+        
+        // Obtener información del usuario incluyendo rol
+        console.log('Obteniendo información del usuario...');
+        const userInfo = await apiFetch('/auth/me');
+        state.userRole = userInfo.rol;
+        localStorage.setItem('userRole', userInfo.rol);
         
         // Si todo salió bien, guardar credenciales
         localStorage.setItem('apiUrl', state.baseUrl);
         localStorage.setItem('authToken', token);
         
         selectors.status.textContent = `Conectado. ${state.productos.length} productos cargados.`;
+        selectors.userRole.textContent = `Rol: ${state.userRole}`;
+        selectors.userRole.style.display = 'block';
+        
+        // Actualizar interfaz según rol
+        updateUIForRole();
+        
         console.log('Autenticación exitosa');
     } catch (error) {
         console.error('Error en autenticación:', error);
         selectors.status.textContent = `Error: ${error.message}`;
         state.auth = null;
         localStorage.removeItem('authToken');
+        localStorage.removeItem('userRole');
     }
 });
 
@@ -117,19 +132,19 @@ async function loadLanded() {
             .filter(q => q.sku);
         
         if (skuQueries.length === 0) {
-            selectors.landedTable.innerHTML = '<tr><td colspan="10">Ingrese al menos un SKU para consultar</td></tr>';
+            selectors.landedTable.innerHTML = '<tr><td colspan="6">Ingrese al menos un SKU para consultar</td></tr>';
             hideProductDetails();
             return;
         }
 
-        // Hacer consultas individuales con su transporte específico
+        // Hacer consultas a /pricing/listas en lugar de /pricing/landed
         const promises = skuQueries.map(query => {
             const params = new URLSearchParams();
             params.append('sku', query.sku);
             if (query.transporte) {
                 params.append('transporte', query.transporte);
             }
-            return apiFetch(`/pricing/landed?${params.toString()}`);
+            return apiFetch(`/pricing/listas?${params.toString()}`);
         });
 
         const results = await Promise.all(promises);
@@ -139,28 +154,15 @@ async function loadLanded() {
         state.landedData = allData;
         
         if (allData.length === 0) {
-            selectors.landedTable.innerHTML = '<tr><td colspan="10">No se encontraron resultados</td></tr>';
+            selectors.landedTable.innerHTML = '<tr><td colspan="6">No se encontraron resultados</td></tr>';
             hideProductDetails();
             return;
         }
 
+        // Renderizar según rol
         selectors.landedTable.innerHTML = allData
             .slice(0, 100)
-            .map(
-                (row) => `
-                <tr>
-                    <td>${row.sku}</td>
-                    <td>${row.transporte}</td>
-                    <td>${formatCurrency(row.costo_base_mxn)}</td>
-                    <td>${formatPercentage(row.flete_pct)}</td>
-                    <td>${formatPercentage(row.seguro_pct)}</td>
-                    <td>${formatPercentage(row.arancel_pct)}</td>
-                    <td>${formatPercentage(row.dta_pct)}</td>
-                    <td>${formatPercentage(row.honorarios_aduanales_pct)}</td>
-                    <td>${formatCurrency(row.landed_cost_mxn)}</td>
-                    <td>${formatCurrency(row.mark_up)}</td>
-                </tr>`
-            )
+            .map(row => renderPriceRow(row))
             .join('');
         
         // Mostrar detalles de los productos consultados
@@ -275,33 +277,148 @@ function formatPercentage(value) {
     return pct.toFixed(2) + '%';
 }
 
+// Nueva función: Actualizar UI según rol del usuario
+function updateUIForRole() {
+    const role = state.userRole || 'Vendedor';
+    const adminGerenCols = document.querySelectorAll('.admin-gerencia');
+    
+    // Mostrar columnas de costos para Admin y Gerencia
+    if (role === 'Vendedor') {
+        adminGerenCols.forEach(col => col.style.display = 'none');
+        document.getElementById('section-title').textContent = 'Mi Lista de Precios';
+        document.getElementById('section-description').textContent = 'Precios autorizados para cotización (90% a 65% sobre Mark-up)';
+    } else if (role === 'Gerencia_Comercial') {
+        adminGerenCols.forEach(col => col.style.display = 'none');
+        document.getElementById('section-title').textContent = 'Lista de Precios Gerencia Comercial';
+        document.getElementById('section-description').textContent = 'Precios autorizados para cotización (65% a 40% sobre Mark-up)';
+    } else if (role === 'Gerencia') {
+        adminGerenCols.forEach(col => col.style.display = 'table-cell');
+        document.getElementById('section-title').textContent = 'Lista de Precios Gerencia';
+        document.getElementById('section-description').textContent = 'Costos completos y precios autorizados (40% a 10% sobre Mark-up)';
+    } else {
+        // Admin puede ver todo
+        adminGerenCols.forEach(col => col.style.display = 'table-cell');
+        document.getElementById('section-title').textContent = 'Lista de Precios - Vista Administrativa';
+        document.getElementById('section-description').textContent = 'Todas las listas de precios y costos completos';
+    }
+}
+
+// Nueva función: Renderizar fila según rol
+function renderPriceRow(row) {
+    const role = state.userRole || 'Vendedor';
+    
+    let precioMax, precioMin;
+    
+    if (role === 'Vendedor') {
+        precioMax = row.precio_vendedor_max;
+        precioMin = row.precio_vendedor_min;
+    } else if (role === 'Gerencia_Comercial') {
+        precioMax = row.precio_gerencia_com_max;
+        precioMin = row.precio_gerencia_com_min;
+    } else if (role === 'Gerencia') {
+        precioMax = row.precio_gerencia_max;
+        precioMin = row.precio_gerencia_min;
+    } else {
+        // Admin ve rango completo vendedor
+        precioMax = row.precio_vendedor_max;
+        precioMin = row.precio_vendedor_min;
+    }
+    
+    let html = `
+        <tr>
+            <td>${row.sku}</td>
+            <td>${row.transporte}</td>`;
+    
+    // Mostrar costos completos para Gerencia y Admin
+    if (role === 'Gerencia' || role === 'admin') {
+        html += `
+            <td class="admin-gerencia">${formatCurrency(row.costo_base_mxn)}</td>
+            <td class="admin-gerencia">${formatPercentage(row.flete_pct)}</td>
+            <td class="admin-gerencia">${formatPercentage(row.seguro_pct)}</td>
+            <td class="admin-gerencia">${formatPercentage(row.arancel_pct)}</td>
+            <td class="admin-gerencia">${formatPercentage(row.dta_pct)}</td>
+            <td class="admin-gerencia">${formatPercentage(row.honorarios_aduanales_pct)}</td>
+            <td class="admin-gerencia">${formatCurrency(row.landed_cost_mxn)}</td>
+            <td class="admin-gerencia">${formatCurrency(row.precio_base_mxn)}</td>`;
+    }
+    
+    html += `
+            <td class="price-col">${formatCurrency(precioMax)}</td>
+            <td class="price-col">${formatCurrency(precioMin)}</td>
+        </tr>`;
+    
+    return html;
+}
+
 function downloadExcel() {
     if (state.landedData.length === 0) {
         alert('No hay datos para descargar. Realiza una consulta primero.');
         return;
     }
 
-    // Crear CSV con formato Excel
-    const headers = ['SKU', 'Transporte', 'Origen', 'Moneda Base', 'Costo Base', 'TC MXN', 
-                     'Costo Base MXN', 'Flete %', 'Seguro %', 'Arancel %', 'DTA %', 'Hon. Aduanales %',
-                     'Landed Cost MXN', 'Mark-up (10%)'];
+    const role = state.userRole || 'Vendedor';
     
-    const rows = state.landedData.map(row => [
-        row.sku,
-        row.transporte,
-        row.origen || '',
-        row.moneda_base || '',
-        (row.costo_base ?? 0).toFixed(4),
-        (row.tc_mxn ?? 0).toFixed(4),
-        (row.costo_base_mxn ?? 0).toFixed(2),
-        ((row.flete_pct ?? 0) * 100).toFixed(2),
-        ((row.seguro_pct ?? 0) * 100).toFixed(2),
-        ((row.arancel_pct ?? 0) * 100).toFixed(2),
-        ((row.dta_pct ?? 0) * 100).toFixed(2),
-        ((row.honorarios_aduanales_pct ?? 0) * 100).toFixed(2),
-        (row.landed_cost_mxn ?? 0).toFixed(2),
-        (row.mark_up ?? 0).toFixed(2)
-    ]);
+    // Headers según rol
+    let headers, rows;
+    
+    if (role === 'Vendedor') {
+        headers = ['SKU', 'Transporte', 'Precio Máximo', 'Precio Mínimo'];
+        rows = state.landedData.map(row => [
+            row.sku,
+            row.transporte,
+            (row.precio_vendedor_max ?? 0).toFixed(2),
+            (row.precio_vendedor_min ?? 0).toFixed(2)
+        ]);
+    } else if (role === 'Gerencia_Comercial') {
+        headers = ['SKU', 'Transporte', 'Precio Máximo', 'Precio Mínimo'];
+        rows = state.landedData.map(row => [
+            row.sku,
+            row.transporte,
+            (row.precio_gerencia_com_max ?? 0).toFixed(2),
+            (row.precio_gerencia_com_min ?? 0).toFixed(2)
+        ]);
+    } else if (role === 'Gerencia') {
+        headers = ['SKU', 'Transporte', 'Costo Base MXN', 'Flete %', 'Seguro %', 'Arancel %', 
+                   'DTA %', 'Hon. Aduanales %', 'Landed Cost', 'Mark-up Base', 'Precio Máximo', 'Precio Mínimo'];
+        rows = state.landedData.map(row => [
+            row.sku,
+            row.transporte,
+            (row.costo_base_mxn ?? 0).toFixed(2),
+            ((row.flete_pct ?? 0) * 100).toFixed(2),
+            ((row.seguro_pct ?? 0) * 100).toFixed(2),
+            ((row.arancel_pct ?? 0) * 100).toFixed(2),
+            ((row.dta_pct ?? 0) * 100).toFixed(2),
+            ((row.honorarios_aduanales_pct ?? 0) * 100).toFixed(2),
+            (row.landed_cost_mxn ?? 0).toFixed(2),
+            (row.precio_base_mxn ?? 0).toFixed(2),
+            (row.precio_gerencia_max ?? 0).toFixed(2),
+            (row.precio_gerencia_min ?? 0).toFixed(2)
+        ]);
+    } else {
+        // Admin ve todo
+        headers = ['SKU', 'Transporte', 'Costo Base MXN', 'Flete %', 'Seguro %', 'Arancel %', 
+                   'DTA %', 'Hon. Aduanales %', 'Landed Cost', 'Mark-up Base',
+                   'Vendedor Max', 'Vendedor Min', 'Ger.Com Max', 'Ger.Com Min', 
+                   'Gerencia Max', 'Gerencia Min'];
+        rows = state.landedData.map(row => [
+            row.sku,
+            row.transporte,
+            (row.costo_base_mxn ?? 0).toFixed(2),
+            ((row.flete_pct ?? 0) * 100).toFixed(2),
+            ((row.seguro_pct ?? 0) * 100).toFixed(2),
+            ((row.arancel_pct ?? 0) * 100).toFixed(2),
+            ((row.dta_pct ?? 0) * 100).toFixed(2),
+            ((row.honorarios_aduanales_pct ?? 0) * 100).toFixed(2),
+            (row.landed_cost_mxn ?? 0).toFixed(2),
+            (row.precio_base_mxn ?? 0).toFixed(2),
+            (row.precio_vendedor_max ?? 0).toFixed(2),
+            (row.precio_vendedor_min ?? 0).toFixed(2),
+            (row.precio_gerencia_com_max ?? 0).toFixed(2),
+            (row.precio_gerencia_com_min ?? 0).toFixed(2),
+            (row.precio_gerencia_max ?? 0).toFixed(2),
+            (row.precio_gerencia_min ?? 0).toFixed(2)
+        ]);
+    }
 
     // Generar CSV
     const csvContent = [

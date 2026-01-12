@@ -169,6 +169,92 @@ def calculate_landed_costs(
     return landed_rows
 
 
+def calculate_price_lists(cursor, transporte: str) -> List[Dict[str, Any]]:
+    """
+    Calcula las 3 listas de precios con rangos según la jerarquía:
+    - Vendedor: 90% a 65% sobre Mark-up
+    - Gerencia Comercial: 65% a 40% sobre Mark-up
+    - Gerencia: 40% a 10% sobre Mark-up (Mark-up base)
+    """
+    # Obtener listas de precios configuradas
+    cursor.execute(
+        """
+        SELECT nombre_lista, margen_min_pct, margen_max_pct, orden_jerarquia
+        FROM ListasPrecios
+        WHERE activa = 1
+        ORDER BY orden_jerarquia DESC
+        """
+    )
+    listas = cursor.fetchall()
+    
+    if not listas:
+        print("⚠️ No hay listas de precios configuradas")
+        return []
+    
+    # Obtener datos de landed cost y mark_up
+    cursor.execute(
+        """
+        SELECT sku, transporte, landed_cost_mxn, mark_up
+        FROM LandedCostCache
+        WHERE transporte = ?
+        """,
+        transporte,
+    )
+    landed_data = cursor.fetchall()
+    
+    if not landed_data:
+        print(f"⚠️ No hay datos de Landed Cost para transporte {transporte}")
+        return []
+    
+    # Obtener markup_pct de parámetros
+    cursor.execute(
+        "SELECT valor FROM ParametrosImportacion WHERE concepto = 'Mark_up'"
+    )
+    row = cursor.fetchone()
+    markup_pct = float(row[0]) if row else 0.10
+    
+    price_rows: List[Dict[str, Any]] = []
+    
+    for item in landed_data:
+        sku = item[0]
+        trans = item[1]
+        landed_cost = float(item[2])
+        precio_base = float(item[3])  # Mark-up ya calculado
+        
+        # Calcular precios para cada lista
+        # Vendedor: 90% a 65%
+        vendedor = next((l for l in listas if l[0] == 'Vendedor'), None)
+        precio_vendedor_max = precio_base * (1 + float(vendedor[2])) if vendedor else precio_base
+        precio_vendedor_min = precio_base * (1 + float(vendedor[1])) if vendedor else precio_base
+        
+        # Gerencia Comercial: 65% a 40%
+        gerencia_com = next((l for l in listas if l[0] == 'Gerencia_Comercial'), None)
+        precio_gerencia_com_max = precio_base * (1 + float(gerencia_com[2])) if gerencia_com else precio_base
+        precio_gerencia_com_min = precio_base * (1 + float(gerencia_com[1])) if gerencia_com else precio_base
+        
+        # Gerencia: 40% a 10% (Mark-up)
+        gerencia = next((l for l in listas if l[0] == 'Gerencia'), None)
+        precio_gerencia_max = precio_base * (1 + float(gerencia[2])) if gerencia else precio_base
+        precio_gerencia_min = precio_base * (1 + float(gerencia[1])) if gerencia else precio_base
+        
+        price_rows.append({
+            "sku": sku,
+            "transporte": trans,
+            "landed_cost_mxn": landed_cost,
+            "precio_base_mxn": precio_base,
+            "precio_vendedor_max": precio_vendedor_max,
+            "precio_vendedor_min": precio_vendedor_min,
+            "precio_gerencia_com_max": precio_gerencia_com_max,
+            "precio_gerencia_com_min": precio_gerencia_com_min,
+            "precio_gerencia_max": precio_gerencia_max,
+            "precio_gerencia_min": precio_gerencia_min,
+            "markup_pct": markup_pct,
+            "fecha_calculo": datetime.now(timezone.utc),
+        })
+    
+    return price_rows
+
+
 def calculate_price_list(
     landed_rows: Iterable[Dict[str, Any]],
     margenes: Iterable[Dict[str, Any]],
@@ -218,8 +304,8 @@ def persist_rows(
 ) -> None:
     rows = list(rows)
     print(f"{table}: escribiendo {len(rows)} filas")
-    # Si es LandedCostCache, solo eliminar registros del transporte específico
-    if table == "dbo.LandedCostCache" and transporte:
+    # Si es LandedCostCache o PreciosCalculados, solo eliminar registros del transporte específico
+    if table in ["dbo.LandedCostCache", "dbo.PreciosCalculados"] and transporte:
         cursor.execute(f"DELETE FROM {table} WHERE transporte = ?", transporte)
         print(f"  (eliminados registros existentes de transporte: {transporte})")
     else:
@@ -297,14 +383,40 @@ def run_calculations(
             transporte,  # Pasar el transporte para eliminar solo ese tipo
         )
 
+        # Calcular listas de precios
+        print(f"\n📊 Calculando listas de precios para {transporte}...")
+        price_rows = calculate_price_lists(cursor, transporte)
+        
+        if price_rows:
+            persist_rows(
+                cursor,
+                "dbo.PreciosCalculados",
+                [
+                    "sku",
+                    "transporte",
+                    "landed_cost_mxn",
+                    "precio_base_mxn",
+                    "precio_vendedor_max",
+                    "precio_vendedor_min",
+                    "precio_gerencia_com_max",
+                    "precio_gerencia_com_min",
+                    "precio_gerencia_max",
+                    "precio_gerencia_min",
+                    "markup_pct",
+                    "fecha_calculo",
+                ],
+                price_rows,
+                transporte,
+            )
+
         conn.commit()
         summary = {
             "landed_rows": len(landed_rows),
-            "price_rows": 0,
+            "price_rows": len(price_rows) if price_rows else 0,
             "version_id": data.get("version_id"),
         }
         print(
-            f"\n✅ Cálculos almacenados correctamente. Landed={summary['landed_rows']}"
+            f"\n✅ Cálculos almacenados correctamente. Landed={summary['landed_rows']}, Precios={summary['price_rows']}"
         )
         return summary
     finally:

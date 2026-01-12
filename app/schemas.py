@@ -91,3 +91,26 @@ class RecalculateRequest(BaseModel):
 class RecalculateResponse(BaseModel):
     landed_rows: int
     price_rows: int
+
+
+class ListaPrecio(BaseModel):
+    """Schema para las listas de precios con rangos por jerarquía"""
+    sku: str
+    transporte: str
+    landed_cost_mxn: Optional[float]
+    precio_base_mxn: Optional[float]  # Mark-up 10%
+    precio_vendedor_max: Optional[float]  # 90% sobre Mark-up
+    precio_vendedor_min: Optional[float]  # 65% sobre Mark-up
+    precio_gerencia_com_max: Optional[float]  # 65% sobre Mark-up
+    precio_gerencia_com_min: Optional[float]  # 40% sobre Mark-up
+    precio_gerencia_max: Optional[float]  # 40% sobre Mark-up
+    precio_gerencia_min: Optional[float]  # 10% sobre Mark-up (= precio_base_mxn)
+    markup_pct: Optional[float]
+    fecha_calculo: Optional[datetime]
+    # Campos adicionales para admin/gerencia
+    costo_base_mxn: Optional[float]
+    flete_pct: Optional[float]
+    seguro_pct: Optional[float]
+    arancel_pct: Optional[float]
+    dta_pct: Optional[float]
+    honorarios_aduanales_pct: Optional[float]

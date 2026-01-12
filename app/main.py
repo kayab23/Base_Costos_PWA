@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .routes import catalog, pricing
+from .routes import catalog, pricing, auth
 
 app = FastAPI(title=settings.api_title, version=settings.api_version)
 app.add_middleware(
@@ -17,6 +17,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
+app.include_router(auth.router)
 app.include_router(catalog.router)
 app.include_router(pricing.router)
 

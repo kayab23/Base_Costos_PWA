@@ -35,14 +35,15 @@
                 </label>
                 <button id="connect-btn">Autenticar</button>
                 <p id="status-msg" class="status">Sin conexión</p>
+                <p id="user-role" class="status" style="display:none; color: #00ff88; font-weight: 600;"></p>
             </div>
         </section>
 
         <section class="card">
             <header>
                 <div>
-                    <h3>Landed Cost</h3>
-                    <p>Resultados almacenados en LandedCostCache con Mark-up del 10%.</p>
+                    <h3 id="section-title">Listas de Precios</h3>
+                    <p id="section-description">Consulta precios según tu nivel de autorización.</p>
                 </div>
                 <div class="controls-header">
                     <h4>SKUs a cotizar:</h4>
@@ -67,18 +68,20 @@
             </header>
             <div class="table-wrapper">
                 <table id="landed-table">
-                    <thead>
+                    <thead id="table-header">
                         <tr>
                             <th>SKU</th>
                             <th>Transporte</th>
-                            <th>Costo Base MXN</th>
-                            <th>Flete %</th>
-                            <th>Seguro %</th>
-                            <th>Arancel %</th>
-                            <th>DTA %</th>
-                            <th>Hon. Aduanales %</th>
-                            <th>Landed Cost MXN</th>
-                            <th>Mark-up (10%)</th>
+                            <th class="admin-gerencia">Costo Base MXN</th>
+                            <th class="admin-gerencia">Flete %</th>
+                            <th class="admin-gerencia">Seguro %</th>
+                            <th class="admin-gerencia">Arancel %</th>
+                            <th class="admin-gerencia">DTA %</th>
+                            <th class="admin-gerencia">Hon. Aduanales %</th>
+                            <th class="admin-gerencia">Landed Cost</th>
+                            <th class="admin-gerencia">Mark-up Base</th>
+                            <th class="price-col">Precio Máximo</th>
+                            <th class="price-col">Precio Mínimo</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
