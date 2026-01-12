@@ -358,66 +358,94 @@ function downloadExcel() {
 
     const role = state.userRole || 'Vendedor';
     
-    // Headers según rol
+    // Headers según rol - INCLUIR DETALLES DE PRODUCTOS
     let headers, rows;
     
     if (role === 'Vendedor') {
-        headers = ['SKU', 'Transporte', 'Precio Máximo', 'Precio Mínimo'];
-        rows = state.landedData.map(row => [
-            row.sku,
-            row.transporte,
-            (row.precio_vendedor_max ?? 0).toFixed(2),
-            (row.precio_vendedor_min ?? 0).toFixed(2)
-        ]);
+        headers = ['SKU', 'Descripción', 'Proveedor', 'Categoría', 'Transporte', 'Precio Máximo', 'Precio Mínimo'];
+        rows = state.landedData.map(row => {
+            const producto = state.productos.find(p => p.sku === row.sku) || {};
+            return [
+                row.sku,
+                producto.descripcion || '',
+                producto.proveedor || '',
+                producto.categoria || '',
+                row.transporte,
+                (row.precio_vendedor_max ?? 0).toFixed(2),
+                (row.precio_vendedor_min ?? 0).toFixed(2)
+            ];
+        });
     } else if (role === 'Gerencia_Comercial') {
-        headers = ['SKU', 'Transporte', 'Precio Máximo', 'Precio Mínimo'];
-        rows = state.landedData.map(row => [
-            row.sku,
-            row.transporte,
-            (row.precio_gerencia_com_max ?? 0).toFixed(2),
-            (row.precio_gerencia_com_min ?? 0).toFixed(2)
-        ]);
+        headers = ['SKU', 'Descripción', 'Proveedor', 'Categoría', 'Transporte', 'Precio Máximo', 'Precio Mínimo'];
+        rows = state.landedData.map(row => {
+            const producto = state.productos.find(p => p.sku === row.sku) || {};
+            return [
+                row.sku,
+                producto.descripcion || '',
+                producto.proveedor || '',
+                producto.categoria || '',
+                row.transporte,
+                (row.precio_gerencia_com_max ?? 0).toFixed(2),
+                (row.precio_gerencia_com_min ?? 0).toFixed(2)
+            ];
+        });
     } else if (role === 'Gerencia') {
-        headers = ['SKU', 'Transporte', 'Costo Base MXN', 'Flete %', 'Seguro %', 'Arancel %', 
+        headers = ['SKU', 'Descripción', 'Proveedor', 'Categoría', 'Origen', 'Transporte', 
+                   'Costo Base MXN', 'Flete %', 'Seguro %', 'Arancel %', 
                    'DTA %', 'Hon. Aduanales %', 'Landed Cost', 'Mark-up Base', 'Precio Máximo', 'Precio Mínimo'];
-        rows = state.landedData.map(row => [
-            row.sku,
-            row.transporte,
-            (row.costo_base_mxn ?? 0).toFixed(2),
-            ((row.flete_pct ?? 0) * 100).toFixed(2),
-            ((row.seguro_pct ?? 0) * 100).toFixed(2),
-            ((row.arancel_pct ?? 0) * 100).toFixed(2),
-            ((row.dta_pct ?? 0) * 100).toFixed(2),
-            ((row.honorarios_aduanales_pct ?? 0) * 100).toFixed(2),
-            (row.landed_cost_mxn ?? 0).toFixed(2),
-            (row.precio_base_mxn ?? 0).toFixed(2),
-            (row.precio_gerencia_max ?? 0).toFixed(2),
-            (row.precio_gerencia_min ?? 0).toFixed(2)
-        ]);
+        rows = state.landedData.map(row => {
+            const producto = state.productos.find(p => p.sku === row.sku) || {};
+            return [
+                row.sku,
+                producto.descripcion || '',
+                producto.proveedor || '',
+                producto.categoria || '',
+                producto.origen || '',
+                row.transporte,
+                (row.costo_base_mxn ?? 0).toFixed(2),
+                ((row.flete_pct ?? 0) * 100).toFixed(2),
+                ((row.seguro_pct ?? 0) * 100).toFixed(2),
+                ((row.arancel_pct ?? 0) * 100).toFixed(2),
+                ((row.dta_pct ?? 0) * 100).toFixed(2),
+                ((row.honorarios_aduanales_pct ?? 0) * 100).toFixed(2),
+                (row.landed_cost_mxn ?? 0).toFixed(2),
+                (row.precio_base_mxn ?? 0).toFixed(2),
+                (row.precio_gerencia_max ?? 0).toFixed(2),
+                (row.precio_gerencia_min ?? 0).toFixed(2)
+            ];
+        });
     } else {
         // Admin ve todo
-        headers = ['SKU', 'Transporte', 'Costo Base MXN', 'Flete %', 'Seguro %', 'Arancel %', 
+        headers = ['SKU', 'Descripción', 'Proveedor', 'Categoría', 'Origen', 'Transporte',
+                   'Costo Base MXN', 'Flete %', 'Seguro %', 'Arancel %', 
                    'DTA %', 'Hon. Aduanales %', 'Landed Cost', 'Mark-up Base',
                    'Vendedor Max', 'Vendedor Min', 'Ger.Com Max', 'Ger.Com Min', 
                    'Gerencia Max', 'Gerencia Min'];
-        rows = state.landedData.map(row => [
-            row.sku,
-            row.transporte,
-            (row.costo_base_mxn ?? 0).toFixed(2),
-            ((row.flete_pct ?? 0) * 100).toFixed(2),
-            ((row.seguro_pct ?? 0) * 100).toFixed(2),
-            ((row.arancel_pct ?? 0) * 100).toFixed(2),
-            ((row.dta_pct ?? 0) * 100).toFixed(2),
-            ((row.honorarios_aduanales_pct ?? 0) * 100).toFixed(2),
-            (row.landed_cost_mxn ?? 0).toFixed(2),
-            (row.precio_base_mxn ?? 0).toFixed(2),
-            (row.precio_vendedor_max ?? 0).toFixed(2),
-            (row.precio_vendedor_min ?? 0).toFixed(2),
-            (row.precio_gerencia_com_max ?? 0).toFixed(2),
-            (row.precio_gerencia_com_min ?? 0).toFixed(2),
-            (row.precio_gerencia_max ?? 0).toFixed(2),
-            (row.precio_gerencia_min ?? 0).toFixed(2)
-        ]);
+        rows = state.landedData.map(row => {
+            const producto = state.productos.find(p => p.sku === row.sku) || {};
+            return [
+                row.sku,
+                producto.descripcion || '',
+                producto.proveedor || '',
+                producto.categoria || '',
+                producto.origen || '',
+                row.transporte,
+                (row.costo_base_mxn ?? 0).toFixed(2),
+                ((row.flete_pct ?? 0) * 100).toFixed(2),
+                ((row.seguro_pct ?? 0) * 100).toFixed(2),
+                ((row.arancel_pct ?? 0) * 100).toFixed(2),
+                ((row.dta_pct ?? 0) * 100).toFixed(2),
+                ((row.honorarios_aduanales_pct ?? 0) * 100).toFixed(2),
+                (row.landed_cost_mxn ?? 0).toFixed(2),
+                (row.precio_base_mxn ?? 0).toFixed(2),
+                (row.precio_vendedor_max ?? 0).toFixed(2),
+                (row.precio_vendedor_min ?? 0).toFixed(2),
+                (row.precio_gerencia_com_max ?? 0).toFixed(2),
+                (row.precio_gerencia_com_min ?? 0).toFixed(2),
+                (row.precio_gerencia_max ?? 0).toFixed(2),
+                (row.precio_gerencia_min ?? 0).toFixed(2)
+            ];
+        });
     }
 
     // Generar CSV
