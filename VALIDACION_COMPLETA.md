@@ -79,17 +79,29 @@
 | gercom1 | GerCom123! | ✅ |
 | vendedor1 | Vend123! | ✅ |
 
-### BASE DE DATOS
+### BASE DE DATOS - VALIDADO 13/ENE/2026
 ✅ Tabla `Usuarios` contiene 6 usuarios (incluye gerencia1)
-✅ Tabla `PreciosCalculados` tiene los 5 campos de precios mínimos
+  - Roles correctos: admin, Direccion, Subdireccion, Gerencia_Comercial, Vendedor, Gerencia
+  - Todos activos (es_activo=1)
+  
+✅ Tabla `PreciosCalculados` estructura completa
+  - 854 registros totales (427 SKUs × 2 transportes)
+  - 6 campos de precios: precio_maximo, precio_vendedor_min, precio_gerente_com_min, precio_subdireccion_min, precio_direccion_min, precio_base_mxn
+  - 0 valores nulos en campos críticos
+  
 ✅ Todos los cálculos verificados para HP30B-CTO-01
+  - Aéreo: Máximo $22,403.66 → Mínimos desde $17,922.93 hasta $14,562.38
+  - Marítimo: Máximo $21,445.00 → Mínimos desde $17,156.00 hasta $13,939.25
 
 ### BACKEND
 ✅ API `/pricing/listas` retorna todos los campos correctamente
 ✅ Autenticación Basic Auth funcional
 ✅ Esquemas Pydantic incluyen todos los campos
 
-### FRONTEND
-⚠️ PENDIENTE: Verificar que Gerencia_Comercial vea columnas de costos
-- Archivo: `frontend/app.js`
-- Línea 398: Actualizada para incluir Gerencia_Comercial en roles que ven costos
+### FRONTEND - VALIDADO 13/ENE/2026
+✅ `frontend/app.js` actualizado correctamente
+  - Línea 281-289: Gerencia_Comercial incluida en roles que ven costos
+  - Línea 399: renderPriceRow() muestra costos para todos excepto Vendedor
+  - updateUIForRole() configura descripción correcta: "25% descuento desde Precio Máximo"
+  
+✅ Todos los roles muestran información correcta según jerarquía
