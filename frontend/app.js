@@ -282,9 +282,15 @@ function updateUIForRole() {
     const role = state.userRole || 'Vendedor';
     const adminGerenCols = document.querySelectorAll('.admin-gerencia');
     
-    // Mostrar columnas de costos para Admin y Gerencia
+    // Mostrar columnas de costos para todos EXCEPTO Vendedor
     if (role === 'Vendedor') {
         adminGerenCols.forEach(col => col.style.display = 'none');
+    } else {
+        adminGerenCols.forEach(col => col.style.display = 'table-cell');
+    }
+    
+    // Configurar UI según rol
+    if (role === 'Vendedor') {
         document.getElementById('section-title').textContent = 'Mi Lista de Precios';
         document.getElementById('section-description').textContent = 'Precios autorizados para cotización (90% a 65% sobre Mark-up)';
         
@@ -295,9 +301,8 @@ function updateUIForRole() {
         
         loadMisSolicitudes();
     } else if (role === 'Gerencia_Comercial') {
-        adminGerenCols.forEach(col => col.style.display = 'none');
         document.getElementById('section-title').textContent = 'Lista de Precios Gerencia Comercial';
-        document.getElementById('section-description').textContent = 'Precios autorizados para cotización (65% a 40% sobre Mark-up)';
+        document.getElementById('section-description').textContent = 'Costos completos y precios autorizados (25% descuento desde Precio Máximo)';
         
         // Mostrar solicitud de autorización y pendientes
         document.getElementById('solicitar-autorizacion-section').style.display = 'block';
@@ -308,8 +313,32 @@ function updateUIForRole() {
         loadMisSolicitudes();
         loadPendientes();
         loadProcesadas();
+    } else if (role === 'Subdireccion') {
+        document.getElementById('section-title').textContent = 'Lista de Precios Subdirección';
+        document.getElementById('section-description').textContent = 'Costos completos y precios autorizados (30% descuento)';
+        
+        // Puede solicitar y ver pendientes
+        document.getElementById('solicitar-autorizacion-section').style.display = 'block';
+        document.getElementById('mis-solicitudes-section').style.display = 'block';
+        document.getElementById('pendientes-section').style.display = 'block';
+        document.getElementById('procesadas-section').style.display = 'block';
+        
+        loadMisSolicitudes();
+        loadPendientes();
+        loadProcesadas();
+    } else if (role === 'Direccion') {
+        document.getElementById('section-title').textContent = 'Lista de Precios Dirección';
+        document.getElementById('section-description').textContent = 'Costos completos y precios autorizados (35% descuento)';
+        
+        // Solo ver pendientes, no puede solicitar
+        document.getElementById('solicitar-autorizacion-section').style.display = 'none';
+        document.getElementById('mis-solicitudes-section').style.display = 'none';
+        document.getElementById('pendientes-section').style.display = 'block';
+        document.getElementById('procesadas-section').style.display = 'block';
+        
+        loadPendientes();
+        loadProcesadas();
     } else if (role === 'Gerencia') {
-        adminGerenCols.forEach(col => col.style.display = 'table-cell');
         document.getElementById('section-title').textContent = 'Lista de Precios Gerencia';
         document.getElementById('section-description').textContent = 'Costos completos y precios autorizados (40% a 10% sobre Mark-up)';
         
@@ -323,7 +352,6 @@ function updateUIForRole() {
         loadProcesadas();
     } else {
         // Admin puede ver todo
-        adminGerenCols.forEach(col => col.style.display = 'table-cell');
         document.getElementById('section-title').textContent = 'Lista de Precios - Vista Administrativa';
         document.getElementById('section-description').textContent = 'Todas las listas de precios y costos completos';
         
@@ -345,18 +373,21 @@ function renderPriceRow(row) {
     let precioMax, precioMin;
     
     if (role === 'Vendedor') {
-        precioMax = row.precio_vendedor_max;
+        precioMax = row.precio_maximo;
         precioMin = row.precio_vendedor_min;
     } else if (role === 'Gerencia_Comercial') {
-        precioMax = row.precio_gerencia_com_max;
-        precioMin = row.precio_gerencia_com_min;
-    } else if (role === 'Gerencia') {
-        precioMax = row.precio_gerencia_max;
-        precioMin = row.precio_gerencia_min;
+        precioMax = row.precio_maximo;
+        precioMin = row.precio_gerente_com_min;
+    } else if (role === 'Subdireccion') {
+        precioMax = row.precio_maximo;
+        precioMin = row.precio_subdireccion_min;
+    } else if (role === 'Direccion') {
+        precioMax = row.precio_maximo;
+        precioMin = row.precio_direccion_min;
     } else {
-        // Admin ve rango completo vendedor
-        precioMax = row.precio_vendedor_max;
-        precioMin = row.precio_vendedor_min;
+        // Admin ve precio máximo y mínimo absoluto
+        precioMax = row.precio_maximo;
+        precioMin = row.precio_direccion_min;
     }
     
     let html = `
@@ -364,8 +395,8 @@ function renderPriceRow(row) {
             <td>${row.sku}</td>
             <td>${row.transporte}</td>`;
     
-    // Mostrar costos completos para Gerencia y Admin
-    if (role === 'Gerencia' || role === 'admin') {
+    // Mostrar costos completos para roles administrativos (todos excepto Vendedor)
+    if (role !== 'Vendedor') {
         html += `
             <td class="admin-gerencia">${formatCurrency(row.costo_base_mxn)}</td>
             <td class="admin-gerencia">${formatPercentage(row.flete_pct)}</td>
@@ -406,7 +437,7 @@ function downloadExcel() {
                 producto.proveedor || '',
                 producto.categoria || '',
                 row.transporte,
-                (row.precio_vendedor_max ?? 0).toFixed(2),
+                (row.precio_maximo ?? 0).toFixed(2),
                 (row.precio_vendedor_min ?? 0).toFixed(2)
             ];
         });
@@ -420,16 +451,19 @@ function downloadExcel() {
                 producto.proveedor || '',
                 producto.categoria || '',
                 row.transporte,
-                (row.precio_gerencia_com_max ?? 0).toFixed(2),
-                (row.precio_gerencia_com_min ?? 0).toFixed(2)
+                (row.precio_maximo ?? 0).toFixed(2),
+                (row.precio_gerente_com_min ?? 0).toFixed(2)
             ];
         });
-    } else if (role === 'Gerencia') {
+    } else if (role === 'Subdireccion' || role === 'Direccion' || role === 'Gerencia') {
         headers = ['SKU', 'Descripción', 'Proveedor', 'Categoría', 'Origen', 'Transporte', 
                    'Costo Base MXN', 'Flete %', 'Seguro %', 'Arancel %', 
                    'DTA %', 'Hon. Aduanales %', 'Landed Cost', 'Mark-up Base', 'Precio Máximo', 'Precio Mínimo'];
         rows = state.landedData.map(row => {
             const producto = state.productos.find(p => p.sku === row.sku) || {};
+            const precioMin = role === 'Subdireccion' ? row.precio_subdireccion_min : 
+                             role === 'Direccion' ? row.precio_direccion_min : 
+                             row.precio_gerente_com_min;
             return [
                 row.sku,
                 producto.descripcion || '',
@@ -445,8 +479,8 @@ function downloadExcel() {
                 ((row.honorarios_aduanales_pct ?? 0) * 100).toFixed(2),
                 (row.landed_cost_mxn ?? 0).toFixed(2),
                 (row.precio_base_mxn ?? 0).toFixed(2),
-                (row.precio_gerencia_max ?? 0).toFixed(2),
-                (row.precio_gerencia_min ?? 0).toFixed(2)
+                (row.precio_maximo ?? 0).toFixed(2),
+                (precioMin ?? 0).toFixed(2)
             ];
         });
     } else {
@@ -454,8 +488,7 @@ function downloadExcel() {
         headers = ['SKU', 'Descripción', 'Proveedor', 'Categoría', 'Origen', 'Transporte',
                    'Costo Base MXN', 'Flete %', 'Seguro %', 'Arancel %', 
                    'DTA %', 'Hon. Aduanales %', 'Landed Cost', 'Mark-up Base',
-                   'Vendedor Max', 'Vendedor Min', 'Ger.Com Max', 'Ger.Com Min', 
-                   'Gerencia Max', 'Gerencia Min'];
+                   'Precio Máximo', 'Vendedor Min', 'Ger.Com Min', 'Subdir Min', 'Dirección Min'];
         rows = state.landedData.map(row => {
             const producto = state.productos.find(p => p.sku === row.sku) || {};
             return [
@@ -473,12 +506,11 @@ function downloadExcel() {
                 ((row.honorarios_aduanales_pct ?? 0) * 100).toFixed(2),
                 (row.landed_cost_mxn ?? 0).toFixed(2),
                 (row.precio_base_mxn ?? 0).toFixed(2),
-                (row.precio_vendedor_max ?? 0).toFixed(2),
+                (row.precio_maximo ?? 0).toFixed(2),
                 (row.precio_vendedor_min ?? 0).toFixed(2),
-                (row.precio_gerencia_com_max ?? 0).toFixed(2),
-                (row.precio_gerencia_com_min ?? 0).toFixed(2),
-                (row.precio_gerencia_max ?? 0).toFixed(2),
-                (row.precio_gerencia_min ?? 0).toFixed(2)
+                (row.precio_gerente_com_min ?? 0).toFixed(2),
+                (row.precio_subdireccion_min ?? 0).toFixed(2),
+                (row.precio_direccion_min ?? 0).toFixed(2)
             ];
         });
     }

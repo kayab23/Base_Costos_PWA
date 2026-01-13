@@ -84,17 +84,19 @@ def get_listas_precios(
     user=Depends(get_current_user),
 ):
     """
-    Obtiene las listas de precios calculadas con rangos por jerarquía:
-    - Vendedor: 90% a 65% sobre Mark-up
-    - Gerencia Comercial: 65% a 40% sobre Mark-up
-    - Gerencia: 40% a 10% sobre Mark-up
+    Obtiene las listas de precios calculadas con nueva jerarquía de 4 niveles:
+    - Precio Máximo: Mark-up × 2
+    - Vendedor: 20% descuento del Precio Máximo
+    - Gerente Comercial: 25% descuento del Precio Máximo
+    - Subdirección: 30% descuento del Precio Máximo
+    - Dirección: 35% descuento del Precio Máximo
     """
     cursor = conn.cursor()
     query = """
         SELECT p.sku, p.transporte, p.landed_cost_mxn, p.precio_base_mxn,
-               p.precio_vendedor_max, p.precio_vendedor_min,
-               p.precio_gerencia_com_max, p.precio_gerencia_com_min,
-               p.precio_gerencia_max, p.precio_gerencia_min,
+               p.precio_maximo, p.precio_vendedor_min,
+               p.precio_gerente_com_min, p.precio_subdireccion_min,
+               p.precio_direccion_min,
                p.markup_pct, p.fecha_calculo,
                p.costo_base_mxn, p.flete_pct, p.seguro_pct, 
                p.arancel_pct, p.dta_pct, p.honorarios_aduanales_pct, p.categoria

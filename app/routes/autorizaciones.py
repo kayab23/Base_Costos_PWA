@@ -9,13 +9,19 @@ router = APIRouter(prefix="/autorizaciones", tags=["autorizaciones"])
 
 def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, nivel_solicitante: str, conn):
     """
-    Determina qué nivel debe autorizar basado en el precio propuesto y el nivel del solicitante
+    Determina qué nivel debe autorizar basado en el precio propuesto y el nivel del solicitante.
+    Nueva jerarquía de 4 niveles:
+    - Vendedor → puede vender hasta precio_vendedor_min (necesita autorización si baja más)
+    - Gerente_Comercial → puede autorizar hasta precio_gerente_com_min
+    - Subdirección → puede autorizar hasta precio_subdireccion_min
+    - Dirección → puede autorizar hasta precio_direccion_min
     """
     cursor = conn.cursor()
     
     # Obtener precios del producto
     cursor.execute("""
-        SELECT precio_base_mxn, precio_vendedor_min, precio_gerencia_com_min, precio_gerencia_min
+        SELECT precio_base_mxn, precio_vendedor_min, precio_gerente_com_min, 
+               precio_subdireccion_min, precio_direccion_min
         FROM PreciosCalculados
         WHERE sku = ? AND transporte = ?
     """, (sku, transporte))
@@ -24,13 +30,14 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
     if not row:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
     
-    precio_base, precio_vendedor_min, precio_gerencia_com_min, precio_gerencia_min = row
+    precio_base, precio_vendedor_min, precio_gerente_com_min, precio_subdireccion_min, precio_direccion_min = row
     
     # Convertir Decimals a float para cálculos
     precio_base = float(precio_base) if precio_base else 0
     precio_vendedor_min = float(precio_vendedor_min) if precio_vendedor_min else 0
-    precio_gerencia_com_min = float(precio_gerencia_com_min) if precio_gerencia_com_min else 0
-    precio_gerencia_min = float(precio_gerencia_min) if precio_gerencia_min else 0
+    precio_gerente_com_min = float(precio_gerente_com_min) if precio_gerente_com_min else 0
+    precio_subdireccion_min = float(precio_subdireccion_min) if precio_subdireccion_min else 0
+    precio_direccion_min = float(precio_direccion_min) if precio_direccion_min else 0
     
     # Validar que no sea menor al precio base (Mark-up)
     if precio_propuesto < precio_base:
@@ -39,19 +46,40 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
             detail=f"El precio propuesto (${precio_propuesto:,.2f}) no puede ser menor al precio base (${precio_base:,.2f})"
         )
     
-    # Determinar nivel autorizador
+    # Determinar nivel autorizador según el nivel del solicitante
     if nivel_solicitante == 'Vendedor':
-        # Si el precio está dentro del rango de Gerencia Comercial, lo autoriza Gerencia Comercial
-        if precio_propuesto >= precio_gerencia_com_min:
+        # Si el precio está dentro del rango de Gerente Comercial, lo autoriza Gerente Comercial
+        if precio_propuesto >= precio_gerente_com_min:
             return 'Gerencia_Comercial', precio_vendedor_min
-        # Si es menor, debe autorizar Gerencia
+        # Si está en rango de Subdirección
+        elif precio_propuesto >= precio_subdireccion_min:
+            return 'Subdireccion', precio_vendedor_min
+        # Si está en rango de Dirección
+        elif precio_propuesto >= precio_direccion_min:
+            return 'Direccion', precio_vendedor_min
         else:
-            return 'Gerencia', precio_vendedor_min
+            raise HTTPException(
+                status_code=400,
+                detail=f"El precio propuesto (${precio_propuesto:,.2f}) está fuera del rango autorizable"
+            )
     
     elif nivel_solicitante == 'Gerencia_Comercial':
-        # Solo Gerencia puede autorizar
-        if precio_propuesto >= precio_gerencia_min:
-            return 'Gerencia', precio_gerencia_com_min
+        # Si está en rango de Subdirección
+        if precio_propuesto >= precio_subdireccion_min:
+            return 'Subdireccion', precio_gerente_com_min
+        # Si está en rango de Dirección
+        elif precio_propuesto >= precio_direccion_min:
+            return 'Direccion', precio_gerente_com_min
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El precio propuesto (${precio_propuesto:,.2f}) está fuera del rango autorizable"
+            )
+    
+    elif nivel_solicitante == 'Subdireccion':
+        # Solo Dirección puede autorizar
+        if precio_propuesto >= precio_direccion_min:
+            return 'Direccion', precio_subdireccion_min
         else:
             raise HTTPException(
                 status_code=400,
@@ -70,9 +98,9 @@ def crear_solicitud(
 ):
     """Crear una solicitud de autorización de descuento"""
     
-    # Validar que el usuario sea Vendedor o Gerencia_Comercial
-    if current_user["rol"] not in ['Vendedor', 'Gerencia_Comercial']:
-        raise HTTPException(status_code=403, detail="Solo Vendedores y Gerencia Comercial pueden solicitar autorizaciones")
+    # Validar que el usuario tenga un rol que pueda solicitar autorizaciones
+    if current_user["rol"] not in ['Vendedor', 'Gerencia_Comercial', 'Subdireccion']:
+        raise HTTPException(status_code=403, detail="Solo Vendedores, Gerencia Comercial y Subdirección pueden solicitar autorizaciones")
     
     # Determinar nivel autorizador y precio mínimo actual
     nivel_autorizador, precio_minimo_actual = determinar_autorizador(
@@ -198,8 +226,8 @@ def obtener_solicitudes_procesadas(
 ):
     """Obtener solicitudes que el usuario ha aprobado o rechazado"""
     
-    # Solo Gerencia Comercial y Gerencia pueden ver su historial
-    if current_user["rol"] not in ['Gerencia_Comercial', 'Gerencia', 'admin']:
+    # Solo Gerencia Comercial, Subdirección, Dirección y admin pueden ver su historial
+    if current_user["rol"] not in ['Gerencia_Comercial', 'Subdireccion', 'Direccion', 'admin']:
         raise HTTPException(status_code=403, detail="No tiene permisos para ver historial de aprobaciones")
     
     cursor = conn.cursor()
@@ -247,14 +275,13 @@ def obtener_solicitudes_pendientes(
 ):
     """Obtener solicitudes pendientes que el usuario puede autorizar"""
     
-    # Solo Gerencia Comercial y Gerencia pueden ver solicitudes pendientes
-    if current_user["rol"] not in ['Gerencia_Comercial', 'Gerencia', 'admin']:
+    # Solo roles autorizadores pueden ver solicitudes pendientes
+    if current_user["rol"] not in ['Gerencia_Comercial', 'Subdireccion', 'Direccion', 'admin']:
         raise HTTPException(status_code=403, detail="No tiene permisos para ver solicitudes pendientes")
     
     cursor = conn.cursor()
     
-    # Gerencia Comercial solo ve solicitudes de Vendedores con precio >= precio_gerencia_com_min
-    # Gerencia ve todas las solicitudes pendientes
+    # Cada nivel ve solo las solicitudes que puede autorizar
     if current_user["rol"] == 'Gerencia_Comercial':
         cursor.execute("""
             SELECT s.id, s.sku, s.transporte, s.solicitante_id, s.solicitante, s.nivel_solicitante,
@@ -265,10 +292,23 @@ def obtener_solicitudes_pendientes(
             INNER JOIN PreciosCalculados p ON s.sku = p.sku AND s.transporte = p.transporte
             WHERE s.estado = 'Pendiente' 
             AND s.nivel_solicitante = 'Vendedor'
-            AND s.precio_propuesto >= p.precio_gerencia_com_min
+            AND s.precio_propuesto >= p.precio_gerente_com_min
             ORDER BY s.fecha_solicitud
         """)
-    else:  # Gerencia o admin
+    elif current_user["rol"] == 'Subdireccion':
+        cursor.execute("""
+            SELECT s.id, s.sku, s.transporte, s.solicitante_id, s.solicitante, s.nivel_solicitante,
+                   s.precio_propuesto, s.precio_minimo_actual, s.descuento_adicional_pct,
+                   s.cliente, s.cantidad, s.justificacion, s.estado, s.autorizador_id, s.autorizador,
+                   s.fecha_solicitud, s.fecha_respuesta, s.comentarios_autorizador
+            FROM vw_SolicitudesAutorizacion s
+            INNER JOIN PreciosCalculados p ON s.sku = p.sku AND s.transporte = p.transporte
+            WHERE s.estado = 'Pendiente' 
+            AND s.nivel_solicitante IN ('Vendedor', 'Gerencia_Comercial')
+            AND s.precio_propuesto >= p.precio_subdireccion_min
+            ORDER BY s.fecha_solicitud
+        """)
+    else:  # Dirección o admin
         cursor.execute("""
             SELECT id, sku, transporte, solicitante_id, solicitante, nivel_solicitante,
                    precio_propuesto, precio_minimo_actual, descuento_adicional_pct,

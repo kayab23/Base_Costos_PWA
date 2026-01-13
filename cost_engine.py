@@ -241,33 +241,32 @@ def calculate_price_lists(cursor, transporte: str) -> List[Dict[str, Any]]:
         honorarios_aduanales_pct = float(item[9]) if item[9] is not None else 0.0
         categoria = item[10] if item[10] else ""
         
-        # Calcular precios para cada lista
-        # Vendedor: 90% a 65%
-        vendedor = next((l for l in listas if l[0] == 'Vendedor'), None)
-        precio_vendedor_max = precio_base * (1 + float(vendedor[2])) if vendedor else precio_base
-        precio_vendedor_min = precio_base * (1 + float(vendedor[1])) if vendedor else precio_base
+        # Nueva lógica de precios:
+        # Precio Máximo = Mark-up × 2
+        precio_maximo = precio_base * 2
         
-        # Gerencia Comercial: 65% a 40%
-        gerencia_com = next((l for l in listas if l[0] == 'Gerencia_Comercial'), None)
-        precio_gerencia_com_max = precio_base * (1 + float(gerencia_com[2])) if gerencia_com else precio_base
-        precio_gerencia_com_min = precio_base * (1 + float(gerencia_com[1])) if gerencia_com else precio_base
+        # Vendedor: 20% descuento del Precio Máximo
+        precio_vendedor_min = precio_maximo * 0.80
         
-        # Gerencia: 40% a 10% (Mark-up)
-        gerencia = next((l for l in listas if l[0] == 'Gerencia'), None)
-        precio_gerencia_max = precio_base * (1 + float(gerencia[2])) if gerencia else precio_base
-        precio_gerencia_min = precio_base * (1 + float(gerencia[1])) if gerencia else precio_base
+        # Gerente Comercial: 25% descuento del Precio Máximo
+        precio_gerente_com_min = precio_maximo * 0.75
+        
+        # Subdirección: 30% descuento del Precio Máximo
+        precio_subdireccion_min = precio_maximo * 0.70
+        
+        # Dirección: 35% descuento del Precio Máximo
+        precio_direccion_min = precio_maximo * 0.65
         
         price_rows.append({
             "sku": sku,
             "transporte": trans,
             "landed_cost_mxn": landed_cost,
             "precio_base_mxn": precio_base,
-            "precio_vendedor_max": precio_vendedor_max,
+            "precio_maximo": precio_maximo,
             "precio_vendedor_min": precio_vendedor_min,
-            "precio_gerencia_com_max": precio_gerencia_com_max,
-            "precio_gerencia_com_min": precio_gerencia_com_min,
-            "precio_gerencia_max": precio_gerencia_max,
-            "precio_gerencia_min": precio_gerencia_min,
+            "precio_gerente_com_min": precio_gerente_com_min,
+            "precio_subdireccion_min": precio_subdireccion_min,
+            "precio_direccion_min": precio_direccion_min,
             "markup_pct": markup_pct,
             "costo_base_mxn": costo_base_mxn,
             "flete_pct": flete_pct,
@@ -424,12 +423,11 @@ def run_calculations(
                     "transporte",
                     "landed_cost_mxn",
                     "precio_base_mxn",
-                    "precio_vendedor_max",
+                    "precio_maximo",
                     "precio_vendedor_min",
-                    "precio_gerencia_com_max",
-                    "precio_gerencia_com_min",
-                    "precio_gerencia_max",
-                    "precio_gerencia_min",
+                    "precio_gerente_com_min",
+                    "precio_subdireccion_min",
+                    "precio_direccion_min",
                     "markup_pct",
                     "costo_base_mxn",
                     "flete_pct",
