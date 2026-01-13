@@ -120,6 +120,7 @@ class ListaPrecio(BaseModel):
     arancel_pct: Optional[float]
     dta_pct: Optional[float]
     honorarios_aduanales_pct: Optional[float]
+    categoria: Optional[str]
 
 
 class SolicitudAutorizacionCreate(BaseModel):

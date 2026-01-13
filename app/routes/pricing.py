@@ -96,10 +96,9 @@ def get_listas_precios(
                p.precio_gerencia_com_max, p.precio_gerencia_com_min,
                p.precio_gerencia_max, p.precio_gerencia_min,
                p.markup_pct, p.fecha_calculo,
-               l.costo_base_mxn, l.flete_pct, l.seguro_pct, l.arancel_pct,
-               l.dta_pct, l.honorarios_aduanales_pct
+               p.costo_base_mxn, p.flete_pct, p.seguro_pct, 
+               p.arancel_pct, p.dta_pct, p.honorarios_aduanales_pct, p.categoria
         FROM dbo.PreciosCalculados p
-        LEFT JOIN dbo.LandedCostCache l ON p.sku = l.sku AND p.transporte = l.transporte
         WHERE 1=1
     """
     params: list[str] = []

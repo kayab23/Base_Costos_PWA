@@ -40,7 +40,7 @@ def fetch_reference_data(cursor: pyodbc.Cursor) -> Dict[str, Any]:
     # Ahora los costos están en la tabla Productos
     data["productos"] = fetch_dicts(
         cursor,
-        "SELECT sku, origen, moneda_base, costo_base, fecha_actualizacion FROM dbo.Productos",
+        "SELECT sku, origen, categoria, moneda_base, costo_base, fecha_actualizacion FROM dbo.Productos",
     )
     data["parametros"] = fetch_dicts(
         cursor,
@@ -120,7 +120,6 @@ def calculate_landed_costs(
     transporte: str,
 ) -> List[Dict[str, Any]]:
     transporte_key = transporte.strip().lower()
-    flete_pct = pct_params.get(transporte_key, 0.0)
     seguro_pct = pct_params.get("seguro", 0.0)
     arancel_pct = pct_params.get("arancel", 0.0)
     dta_pct = pct_params.get("dta", 0.0)
@@ -136,9 +135,20 @@ def calculate_landed_costs(
         tc = fx_map.get(moneda_costo, 1.0)
         costo_base_mxn = costo_base * tc
 
+        # Obtener categoría del producto
+        categoria = (producto.get("categoria") or "").strip()
+        
+        # Determinar el flete según tipo de transporte (REEMPLAZA valores de 120% y 30%)
+        if transporte_key == "aereo":
+            flete_pct = 0.10  # 10% para transporte Aéreo
+        elif transporte_key == "maritimo":
+            flete_pct = 0.05  # 5% para transporte Marítimo
+        else:
+            flete_pct = 0.0  # Sin flete para otros casos
+
         origen = (producto.get("origen") or "").strip().lower()
         if origen == "importado":
-            # Fórmula Excel: Costo_Base_MXN × (1 + Flete% + Seguro% + Arancel% + DTA% + Honorarios_Aduanales%)
+            # Fórmula: Costo_Base_MXN × (1 + Flete% + Seguro% + Arancel% + DTA% + Honorarios_Aduanales%)
             landed = costo_base_mxn * (1 + flete_pct + seguro_pct + arancel_pct + dta_pct + honorarios_aduanales_pct)
         else:
             landed = costo_base_mxn
@@ -151,6 +161,7 @@ def calculate_landed_costs(
                 "sku": sku,
                 "transporte": transporte,
                 "origen": producto.get("origen"),
+                "categoria": categoria,
                 "moneda_base": moneda_costo,
                 "costo_base": costo_base,
                 "tc_mxn": tc,
@@ -194,7 +205,9 @@ def calculate_price_lists(cursor, transporte: str) -> List[Dict[str, Any]]:
     # Obtener datos de landed cost y mark_up
     cursor.execute(
         """
-        SELECT sku, transporte, landed_cost_mxn, mark_up
+        SELECT sku, transporte, landed_cost_mxn, mark_up, 
+               costo_base_mxn, flete_pct, seguro_pct, arancel_pct, dta_pct, 
+               honorarios_aduanales_pct, categoria
         FROM LandedCostCache
         WHERE transporte = ?
         """,
@@ -218,8 +231,15 @@ def calculate_price_lists(cursor, transporte: str) -> List[Dict[str, Any]]:
     for item in landed_data:
         sku = item[0]
         trans = item[1]
-        landed_cost = float(item[2])
-        precio_base = float(item[3])  # Mark-up ya calculado
+        landed_cost = float(item[2]) if item[2] is not None else 0.0
+        precio_base = float(item[3]) if item[3] is not None else 0.0  # Mark-up ya calculado
+        costo_base_mxn = float(item[4]) if item[4] is not None else 0.0
+        flete_pct = float(item[5]) if item[5] is not None else 0.0
+        seguro_pct = float(item[6]) if item[6] is not None else 0.0
+        arancel_pct = float(item[7]) if item[7] is not None else 0.0
+        dta_pct = float(item[8]) if item[8] is not None else 0.0
+        honorarios_aduanales_pct = float(item[9]) if item[9] is not None else 0.0
+        categoria = item[10] if item[10] else ""
         
         # Calcular precios para cada lista
         # Vendedor: 90% a 65%
@@ -249,6 +269,13 @@ def calculate_price_lists(cursor, transporte: str) -> List[Dict[str, Any]]:
             "precio_gerencia_max": precio_gerencia_max,
             "precio_gerencia_min": precio_gerencia_min,
             "markup_pct": markup_pct,
+            "costo_base_mxn": costo_base_mxn,
+            "flete_pct": flete_pct,
+            "seguro_pct": seguro_pct,
+            "arancel_pct": arancel_pct,
+            "dta_pct": dta_pct,
+            "honorarios_aduanales_pct": honorarios_aduanales_pct,
+            "categoria": categoria,
             "fecha_calculo": datetime.now(timezone.utc),
         })
     
@@ -365,6 +392,7 @@ def run_calculations(
                 "sku",
                 "transporte",
                 "origen",
+                "categoria",
                 "moneda_base",
                 "costo_base",
                 "tc_mxn",
@@ -403,6 +431,13 @@ def run_calculations(
                     "precio_gerencia_max",
                     "precio_gerencia_min",
                     "markup_pct",
+                    "costo_base_mxn",
+                    "flete_pct",
+                    "seguro_pct",
+                    "arancel_pct",
+                    "dta_pct",
+                    "honorarios_aduanales_pct",
+                    "categoria",
                     "fecha_calculo",
                 ],
                 price_rows,
