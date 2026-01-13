@@ -1,4 +1,15 @@
-"""Rutas para cálculos y resultados de pricing."""
+"""Rutas API para consulta de cálculos de pricing y generación de listas de precios.
+
+Endpoints:
+- GET /pricing/landed: Consulta Landed Cost calculados por SKU/transporte
+- GET /pricing/lista: Consulta precios de venta por SKU/cliente
+- GET /pricing/listas: Consulta precios con campos específicos por rol del usuario
+- POST /pricing/recalcular: Ejecuta recálculo completo de precios para un transporte
+
+Control de acceso por rol:
+- Vendedor: Solo ve Precio Máximo y su Precio Mínimo (sin costos)
+- Gerencia Comercial, Subdirección, Dirección, Admin: Ven todos los costos y precios
+"""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query

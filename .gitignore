@@ -20,6 +20,7 @@ fix_*.py
 output.txt
 debug_*.py
 test_*.py
+test_*.ps1
 test_*
 check_*
 verify_*

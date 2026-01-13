@@ -1,3 +1,27 @@
+"""Gestión de solicitudes de autorización de descuentos adicionales.
+
+Este módulo implementa el flujo de autorización jerárquica de 4 niveles para
+solicitudes de descuentos que exceden los precios mínimos de cada rol.
+
+JERARQUÍA DE AUTORIZACIÓN (de menor a mayor autoridad):
+1. Vendedor (20% descuento) → solicita autorización si baja de su mínimo
+2. Gerencia_Comercial (25% descuento) → puede aprobar solicitudes de Vendedor
+3. Subdirección (30% descuento) → puede aprobar solicitudes escaladas
+4. Dirección (35% descuento) → nivel máximo de autorización
+5. Admin → acceso total para monitoreo
+
+LÓGICA DE ESCALAMIENTO:
+- Cada nivel solo puede autorizar descuentos hasta su precio mínimo
+- Si el precio propuesto está debajo del mínimo del autorizador, se rechaza
+  la solicitud con mensaje indicando que debe escalarse al siguiente nivel
+- El flujo es simple: cualquier precio debajo del mínimo del nivel → siguiente nivel
+
+ENDPOINTS:
+- GET /autorizaciones/pendientes: Lista solicitudes pendientes según rol
+- POST /autorizaciones/solicitar: Crea nueva solicitud (Vendedor)
+- PUT /autorizaciones/{id}/aprobar: Aprueba solicitud (niveles superiores)
+- PUT /autorizaciones/{id}/rechazar: Rechaza solicitud (niveles superiores)
+"""
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Optional
 from .. import schemas, db
@@ -8,13 +32,42 @@ router = APIRouter(prefix="/autorizaciones", tags=["autorizaciones"])
 
 
 def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, nivel_solicitante: str, conn):
-    """
-    Determina qué nivel debe autorizar basado en el precio propuesto y el nivel del solicitante.
-    Nueva jerarquía de 4 niveles:
-    - Vendedor → puede vender hasta precio_vendedor_min (necesita autorización si baja más)
-    - Gerente_Comercial → puede autorizar hasta precio_gerente_com_min
-    - Subdirección → puede autorizar hasta precio_subdireccion_min
-    - Dirección → puede autorizar hasta precio_direccion_min
+    """Determina qué nivel jerárquico debe autorizar según el precio propuesto.
+    
+    Lógica de escalamiento simple:
+    - Vendedor (solicita) → Gerencia_Comercial (si precio >= precio_gerente_com_min)
+    - Vendedor (solicita) → Subdirección (si precio < precio_gerente_com_min pero >= precio_subdireccion_min)
+    - Cualquier nivel → Dirección (si precio < precio_subdireccion_min pero >= precio_direccion_min)
+    - Si precio < precio_direccion_min → rechazo automático (debajo de mínimo absoluto)
+    
+    Jerarquía de 4 niveles (de menor a mayor autoridad):
+    1. Vendedor: puede vender hasta precio_vendedor_min (necesita autorización si baja más)
+    2. Gerencia_Comercial: puede autorizar hasta precio_gerente_com_min
+    3. Subdirección: puede autorizar hasta precio_subdireccion_min
+    4. Dirección: puede autorizar hasta precio_direccion_min (mínimo absoluto)
+    
+    Args:
+        precio_propuesto: Precio que el vendedor quiere ofrecer
+        sku: Código del producto
+        transporte: Tipo de transporte ('Aereo' o 'Maritimo')
+        nivel_solicitante: Rol del usuario que solicita ('Vendedor', etc.)
+        conn: Conexión a base de datos
+    
+    Returns:
+        str: Rol del autorizador ('Gerencia_Comercial', 'Subdireccion', 'Direccion')
+        None: Si el precio está por debajo del mínimo absoluto
+    
+    Ejemplo:
+        Precio Máximo: $22,403.66
+        - Vendedor mín (20%): $17,922.93
+        - GerCom mín (25%): $16,802.74
+        - Subdir mín (30%): $15,682.56
+        - Direcc mín (35%): $14,562.38
+        
+        Si vendedor propone $16,000:
+        - Está debajo de $16,802.74 (GerCom mín)
+        - Está arriba de $15,682.56 (Subdir mín)
+        - Autorizador: 'Subdireccion'
     """
     cursor = conn.cursor()
     
@@ -355,7 +408,7 @@ def aprobar_solicitud(
     
     # Verificar que la solicitud existe y está pendiente
     cursor.execute("""
-        SELECT s.*, p.precio_gerencia_com_min
+        SELECT s.*, p.precio_gerente_com_min
         FROM SolicitudesAutorizacion s
         INNER JOIN PreciosCalculados p ON s.sku = p.sku AND s.transporte = p.transporte
         WHERE s.id = ?
@@ -371,10 +424,10 @@ def aprobar_solicitud(
     # Validar que el usuario tiene nivel suficiente para aprobar
     nivel_solicitante = row[4]  # nivel_solicitante (índice 4 = columna 5)
     precio_propuesto = row[5]  # precio_propuesto (índice 5 = columna 6)
-    precio_gerencia_com_min = row[16]  # de la JOIN (índice 16 = columna 17: última columna)
+    precio_gerente_com_min = row[16]  # de la JOIN (índice 16 = columna 17: última columna)
     
     # Jerarquía de aprobación:
-    # - Gerencia_Comercial puede aprobar solicitudes de Vendedor con precio >= precio_gerencia_com_min
+    # - Gerencia_Comercial puede aprobar solicitudes de Vendedor con precio >= precio_gerente_com_min
     # - Gerencia puede aprobar solicitudes de Vendedor (cualquier precio) y de Gerencia_Comercial
     # - admin puede aprobar cualquier solicitud
     
@@ -385,7 +438,7 @@ def aprobar_solicitud(
                 status_code=403,
                 detail="Gerencia Comercial solo puede aprobar solicitudes de Vendedores"
             )
-        if precio_propuesto < precio_gerencia_com_min:
+        if precio_propuesto < precio_gerente_com_min:
             raise HTTPException(
                 status_code=403,
                 detail="El precio propuesto está por debajo de su nivel de autorización. Debe ser aprobado por Gerencia"
@@ -460,7 +513,7 @@ def rechazar_solicitud(
     
     # Verificar que la solicitud existe y está pendiente
     cursor.execute("""
-        SELECT s.estado, s.nivel_solicitante, s.precio_propuesto, p.precio_gerencia_com_min
+        SELECT s.estado, s.nivel_solicitante, s.precio_propuesto, p.precio_gerente_com_min
         FROM SolicitudesAutorizacion s
         INNER JOIN PreciosCalculados p ON s.sku = p.sku AND s.transporte = p.transporte
         WHERE s.id = ?
@@ -477,7 +530,7 @@ def rechazar_solicitud(
     # (misma jerarquía que para aprobar)
     nivel_solicitante = row[1]
     precio_propuesto = row[2]
-    precio_gerencia_com_min = row[3]
+    precio_gerente_com_min = row[3]
     
     if current_user["rol"] == 'Gerencia_Comercial':
         # Solo puede rechazar solicitudes de Vendedor con precio en su rango
@@ -486,7 +539,7 @@ def rechazar_solicitud(
                 status_code=403,
                 detail="Gerencia Comercial solo puede rechazar solicitudes de Vendedores"
             )
-        if precio_propuesto < precio_gerencia_com_min:
+        if precio_propuesto < precio_gerente_com_min:
             raise HTTPException(
                 status_code=403,
                 detail="El precio propuesto está por debajo de su nivel de autorización. Debe ser procesado por Gerencia"

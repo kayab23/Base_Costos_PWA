@@ -1,9 +1,23 @@
 """Sincroniza Plantilla_Pricing_Costos_Importacion.xlsx hacia SQL Server.
 
+Este script lee las hojas del archivo Excel de plantilla y sincroniza los datos
+con las tablas correspondientes en SQL Server:
+
+- Hoja 'Productos' → Tabla dbo.Productos (SKU, costos, origen)
+- Hoja 'Parametros' → Tabla dbo.ParametrosImportacion (aranceles, fletes, etc.)
+- Hoja 'TiposCambio' → Tabla dbo.TiposCambio (tasas de cambio)
+
+El proceso:
+1. Limpia completamente cada tabla antes de insertar nuevos datos
+2. Lee todas las filas de cada hoja (ignorando filas vacías)
+3. Inserta los datos usando fast_executemany para mejor rendimiento
+4. Confirma la transacción (commit) al finalizar exitosamente
+
 Requisitos:
-- py -m pip install openpyxl pyodbc python-dotenv (opcional)
-- Driver ODBC 18 para SQL Server.
-- Variable de entorno SQLSERVER_CONN o ajusta DEFAULT_CONN_STR.
+- py -m pip install openpyxl pyodbc
+- Driver ODBC 18 para SQL Server
+- Variable de entorno SQLSERVER_CONN o ajusta DEFAULT_CONN_STR
+- Archivo Excel en el mismo directorio que este script
 """
 from __future__ import annotations
 

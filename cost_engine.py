@@ -1,7 +1,30 @@
-"""Motor de cálculo para Landed Cost y Lista de Precios.
+"""Motor de cálculo para Landed Cost y Listas de Precios.
 
-Usa los datos ya sincronizados en SQL Server y escribe los resultados en
-LandedCostCache y ListaPrecios para el piloto.
+Este módulo es el núcleo del sistema de cálculo de precios. Realiza:
+
+1. CÁLCULO DE LANDED COST:
+   - Lee costos base de productos desde dbo.Productos
+   - Aplica tasas de cambio desde dbo.TiposCambio
+   - Agrega costos de importación según tipo de transporte:
+     * Aéreo: +10% flete, +seguros, +aranceles, +DTA, +honorarios aduanales
+     * Marítimo: +5% flete, +seguros, +aranceles, +DTA, +honorarios aduanales
+   - Calcula Mark-up (Landed Cost × 1.10)
+   - Guarda resultados en dbo.LandedCostCache
+
+2. CÁLCULO DE LISTAS DE PRECIOS (4 NIVELES JERÁRQUICOS):
+   - Precio Máximo = Mark-up × 2
+   - Vendedor: 20% descuento (Precio Máx × 0.80)
+   - Gerencia Comercial: 25% descuento (Precio Máx × 0.75)
+   - Subdirección: 30% descuento (Precio Máx × 0.70)
+   - Dirección: 35% descuento (Precio Máx × 0.65)
+   - Guarda resultados en dbo.PreciosCalculados
+
+Ejecución:
+  python cost_engine.py --transporte Maritimo
+  python cost_engine.py --transporte Aereo
+
+Nota: Los cálculos son incrementales por tipo de transporte (no se eliminan
+datos de otros transportes al recalcular).
 """
 from __future__ import annotations
 
@@ -328,13 +351,33 @@ def persist_rows(
     rows: Iterable[Dict[str, Any]],
     transporte: str | None = None,
 ) -> None:
+    """Persiste filas en una tabla, eliminando datos existentes según la estrategia.
+    
+    Args:
+        cursor: Cursor de pyodbc para ejecutar queries
+        table: Nombre completo de la tabla (ej: 'dbo.LandedCostCache')
+        columns: Lista de nombres de columnas a insertar
+        rows: Diccionarios con los datos a insertar
+        transporte: Tipo de transporte ('Aereo' o 'Maritimo')
+    
+    Estrategia de eliminación:
+    - Para LandedCostCache y PreciosCalculados: Solo elimina registros del
+      transporte específico para permitir cálculos incrementales por tipo
+      de transporte sin afectar los datos de otros transportes.
+    - Para otras tablas: Limpia completamente la tabla antes de insertar.
+    
+    Usa fast_executemany para inserción masiva eficiente.
+    """
     rows = list(rows)
     print(f"{table}: escribiendo {len(rows)} filas")
+    
     # Si es LandedCostCache o PreciosCalculados, solo eliminar registros del transporte específico
+    # Esto permite recalcular Marítimo sin afectar Aéreo y viceversa
     if table in ["dbo.LandedCostCache", "dbo.PreciosCalculados"] and transporte:
         cursor.execute(f"DELETE FROM {table} WHERE transporte = ?", transporte)
         print(f"  (eliminados registros existentes de transporte: {transporte})")
     else:
+        # Para otras tablas, limpieza completa
         cursor.execute(f"DELETE FROM {table}")
     if not rows:
         return
