@@ -292,7 +292,7 @@ function updateUIForRole() {
     // Configurar UI según rol
     if (role === 'Vendedor') {
         document.getElementById('section-title').textContent = 'Mi Lista de Precios';
-        document.getElementById('section-description').textContent = 'Precios autorizados para cotización (90% a 65% sobre Mark-up)';
+        document.getElementById('section-description').textContent = 'Precios autorizados: 20% descuento desde Precio Máximo';
         
         // Mostrar sección de solicitud de autorización
         document.getElementById('solicitar-autorizacion-section').style.display = 'block';
@@ -340,7 +340,7 @@ function updateUIForRole() {
         loadProcesadas();
     } else if (role === 'Gerencia') {
         document.getElementById('section-title').textContent = 'Lista de Precios Gerencia';
-        document.getElementById('section-description').textContent = 'Costos completos y precios autorizados (40% a 10% sobre Mark-up)';
+        document.getElementById('section-description').textContent = 'Costos completos y vista de todas las autorizaciones';
         
         // Solo ver pendientes, no puede solicitar
         document.getElementById('solicitar-autorizacion-section').style.display = 'none';
