@@ -578,6 +578,12 @@ document.getElementById('solicitud-form')?.addEventListener('submit', async (e) 
     e.preventDefault();
     
     const statusEl = document.getElementById('solicitud-status');
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    
+    // Prevenir múltiples envíos
+    if (submitBtn.disabled) return;
+    submitBtn.disabled = true;
+    
     const data = {
         sku: document.getElementById('sol-sku').value.trim(),
         transporte: document.getElementById('sol-transporte').value,
@@ -607,6 +613,11 @@ document.getElementById('solicitud-form')?.addEventListener('submit', async (e) 
     } catch (error) {
         statusEl.textContent = `❌ Error: ${error.message}`;
         statusEl.style.color = '#f44336';
+    } finally {
+        // Re-habilitar botón después de 1 segundo
+        setTimeout(() => {
+            submitBtn.disabled = false;
+        }, 1000);
     }
 });
 
