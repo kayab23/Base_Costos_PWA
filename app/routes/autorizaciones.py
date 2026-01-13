@@ -47,27 +47,13 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
         )
     
     # Determinar nivel autorizador según el nivel del solicitante
-    # Orden de precios de MAYOR a MENOR: Vendedor > Gerente > Subdir > Dirección > Base
+    # Lógica simple: si el precio está por debajo del mínimo del solicitante,
+    # va al siguiente nivel jerárquico, sin importar qué tan bajo sea
     
     if nivel_solicitante == 'Vendedor':
-        # Si el precio propuesto está por debajo de su mínimo, necesita autorización
+        # Si el precio propuesto está por debajo de su mínimo, va a Gerencia_Comercial
         if precio_propuesto < precio_vendedor_min:
-            # Determinar quién autoriza según qué tan bajo es el precio
-            if precio_propuesto >= precio_gerente_com_min:
-                # Entre Vendedor y Gerente → autoriza Gerencia_Comercial
-                return 'Gerencia_Comercial', precio_vendedor_min
-            elif precio_propuesto >= precio_subdireccion_min:
-                # Entre Gerente y Subdirección → autoriza Subdirección
-                return 'Subdireccion', precio_vendedor_min
-            elif precio_propuesto >= precio_direccion_min:
-                # Entre Subdirección y Dirección → autoriza Dirección
-                return 'Direccion', precio_vendedor_min
-            else:
-                # Menor al mínimo de Dirección → fuera de rango
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"El precio propuesto (${precio_propuesto:,.2f}) está por debajo del precio mínimo de Dirección (${precio_direccion_min:,.2f})"
-                )
+            return 'Gerencia_Comercial', precio_vendedor_min
         else:
             raise HTTPException(
                 status_code=400,
@@ -75,19 +61,9 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
             )
     
     elif nivel_solicitante == 'Gerencia_Comercial':
-        # Si el precio propuesto está por debajo de su mínimo, necesita autorización
+        # Si el precio propuesto está por debajo de su mínimo, va a Subdirección
         if precio_propuesto < precio_gerente_com_min:
-            if precio_propuesto >= precio_subdireccion_min:
-                # Entre Gerente y Subdirección → autoriza Subdirección
-                return 'Subdireccion', precio_gerente_com_min
-            elif precio_propuesto >= precio_direccion_min:
-                # Entre Subdirección y Dirección → autoriza Dirección
-                return 'Direccion', precio_gerente_com_min
-            else:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"El precio propuesto (${precio_propuesto:,.2f}) está por debajo del precio mínimo de Dirección (${precio_direccion_min:,.2f})"
-                )
+            return 'Subdireccion', precio_gerente_com_min
         else:
             raise HTTPException(
                 status_code=400,
@@ -95,15 +71,9 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
             )
     
     elif nivel_solicitante == 'Subdireccion':
-        # Solo Dirección puede autorizar precios por debajo de Subdirección
+        # Si el precio propuesto está por debajo de su mínimo, va a Dirección
         if precio_propuesto < precio_subdireccion_min:
-            if precio_propuesto >= precio_direccion_min:
-                return 'Direccion', precio_subdireccion_min
-            else:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"El precio propuesto (${precio_propuesto:,.2f}) está por debajo del precio mínimo de Dirección (${precio_direccion_min:,.2f})"
-                )
+            return 'Direccion', precio_subdireccion_min
         else:
             raise HTTPException(
                 status_code=400,
