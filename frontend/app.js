@@ -10,6 +10,17 @@ if (logoutBtn) {
         selectors.userRole.style.display = 'none';
         selectors.connectBtn.style.display = '';
         logoutBtn.style.display = 'none';
+        // Limpiar tablas y ocultar secciones sensibles
+        if (selectors.landedTable) selectors.landedTable.innerHTML = '';
+        if (selectors.productDetailsCard) selectors.productDetailsCard.style.display = 'none';
+        // Ocultar secciones de autorizaciones y precios
+        document.querySelectorAll('.card').forEach(card => {
+            if (!card.classList.contains('login-card')) {
+                card.style.display = 'none';
+            }
+        });
+        // Mostrar solo login
+        document.querySelector('.login-card').style.display = '';
         showToast('Sesión cerrada.', 'success');
     });
 }
@@ -103,6 +114,10 @@ async function apiFetch(path, options = {}) {
 }
 
 selectors.connectBtn.addEventListener('click', async () => {
+            // Mostrar todas las secciones tras login
+            document.querySelectorAll('.card').forEach(card => {
+                card.style.display = '';
+            });
     console.log('Botón clickeado');
     try {
         selectors.status.textContent = 'Conectando...';
