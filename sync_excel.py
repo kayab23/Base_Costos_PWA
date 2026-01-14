@@ -1,4 +1,11 @@
-"""Sincroniza Plantilla_Pricing_Costos_Importacion.xlsx hacia SQL Server.
+"""
+OBSOLETO: Este script ya no debe usarse en producción.
+
+ADVERTENCIA: La lógica de la aplicación y la base de datos ya no dependen del archivo Excel.
+Todos los productos, parámetros y tipos de cambio deben gestionarse directamente en la base de datos.
+Este script queda solo como referencia o respaldo histórico.
+
+Sincroniza Plantilla_Pricing_Costos_Importacion.xlsx hacia SQL Server.
 
 Este script lee las hojas del archivo Excel de plantilla y sincroniza los datos
 con las tablas correspondientes en SQL Server:
