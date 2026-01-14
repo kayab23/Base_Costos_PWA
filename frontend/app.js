@@ -1,3 +1,30 @@
+// --- Toast Notification System ---
+function showToast(message, type = 'info', duration = 3500) {
+    let toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    Object.assign(toast.style, {
+        position: 'fixed',
+        bottom: '32px',
+        right: '32px',
+        background: type === 'error' ? '#d32f2f' : type === 'success' ? '#388e3c' : '#1976d2',
+        color: 'white',
+        padding: '14px 24px',
+        borderRadius: '6px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        zIndex: 9999,
+        fontSize: '1rem',
+        opacity: 0.95,
+        transition: 'opacity 0.3s',
+        pointerEvents: 'none',
+    });
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = 0;
+        setTimeout(() => toast.remove(), 400);
+    }, duration);
+}
+
 const state = {
     baseUrl: localStorage.getItem('apiUrl') || 'http://localhost:8000',
     auth: localStorage.getItem('authToken') || null,
@@ -38,8 +65,24 @@ async function apiFetch(path, options = {}) {
         },
     });
     if (!response.ok) {
-        const detail = await response.text();
-        throw new Error(`Error ${response.status}: ${detail}`);
+        let detail = '';
+        let help = '';
+        try {
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                const err = await response.json();
+                detail = err.detail || JSON.stringify(err);
+            } else {
+                detail = await response.text();
+            }
+            help = response.headers.get('x-help') || '';
+        } catch (e) {
+            detail = 'Error inesperado al procesar la respuesta del servidor.';
+        }
+        let msg = `Error ${response.status}: ${detail}`;
+        if (help) msg += `\nSugerencia: ${help}`;
+        showToast(msg, 'error');
+        throw new Error(msg);
     }
     return response.json();
 }
@@ -75,6 +118,7 @@ selectors.connectBtn.addEventListener('click', async () => {
         // Luego intentar autenticar y obtener datos de usuario
         console.log('Cargando productos...');
         await loadProductos();
+        showToast('Productos cargados correctamente.', 'success');
         
         // Obtener información del usuario incluyendo rol
         console.log('Obteniendo información del usuario...');
@@ -93,10 +137,12 @@ selectors.connectBtn.addEventListener('click', async () => {
         // Actualizar interfaz según rol
         updateUIForRole();
         
+        showToast('Inicio de sesión exitoso.', 'success');
         console.log('Autenticación exitosa');
     } catch (error) {
         console.error('Error en autenticación:', error);
         selectors.status.textContent = `Error: ${error.message}`;
+        showToast(error.message, 'error');
         state.auth = null;
         localStorage.removeItem('authToken');
         localStorage.removeItem('userRole');
@@ -117,6 +163,7 @@ async function loadProductos() {
             .join('');
     } catch (error) {
         console.error('Error cargando productos:', error);
+        showToast(error.message, 'error');
     }
 }
 
@@ -174,6 +221,7 @@ async function loadLanded() {
         }
     } catch (error) {
         selectors.status.textContent = error.message;
+        showToast(error.message, 'error');
     }
 }
 
