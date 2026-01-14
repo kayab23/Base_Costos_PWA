@@ -450,7 +450,7 @@ def aprobar_solicitud(
     
     # Verificar que la solicitud existe y está pendiente
     cursor.execute("""
-        SELECT s.*, p.precio_gerente_com_min
+        SELECT s.*, p.precio_gerente_com_min, p.precio_subdireccion_min, p.precio_direccion_min
         FROM SolicitudesAutorizacion s
         INNER JOIN PreciosCalculados p ON s.sku = p.sku AND s.transporte = p.transporte
         WHERE s.id = ?
@@ -465,16 +465,17 @@ def aprobar_solicitud(
         raise HTTPException(status_code=400, detail="La solicitud ya fue procesada")
     
     # Validar que el usuario tiene nivel suficiente para aprobar
-    nivel_solicitante = row[4]  # nivel_solicitante (índice 4 = columna 5)
-    precio_propuesto = row[5]  # precio_propuesto (índice 5 = columna 6)
-    precio_gerente_com_min = row[16]  # de la JOIN (índice 16 = columna 17: última columna)
-    
+    nivel_solicitante = row[4]
+    precio_propuesto = row[5]
+    precio_gerente_com_min = row[16]
+    precio_subdireccion_min = row[17]
+    precio_direccion_min = row[18]
+
     # Jerarquía de aprobación:
     # - Gerencia_Comercial puede aprobar solicitudes de Vendedor con precio >= precio_gerente_com_min
     # - Gerencia puede aprobar solicitudes de Vendedor (cualquier precio) y de Gerencia_Comercial
     # - Subdireccion puede aprobar solicitudes de Vendedor y Gerencia_Comercial (cualquier precio)
-    # - Direccion puede aprobar cualquier solicitud
-    # - admin puede aprobar cualquier solicitud
+    # - Direccion y admin pueden aprobar cualquier solicitud (sin restricción)
 
     if current_user["rol"] == 'Gerencia_Comercial':
         if nivel_solicitante != 'Vendedor':
@@ -499,7 +500,7 @@ def aprobar_solicitud(
                 status_code=403,
                 detail="Subdirección solo puede aprobar solicitudes de Vendedor o Gerencia_Comercial"
             )
-    # Direccion y admin pueden aprobar cualquier solicitud
+    # Direccion y admin: sin restricción
     
     # Aprobar solicitud
     # Validar que comentarios_autorizador nunca sea None
@@ -570,7 +571,7 @@ def rechazar_solicitud(
     
     # Verificar que la solicitud existe y está pendiente
     cursor.execute("""
-        SELECT s.estado, s.nivel_solicitante, s.precio_propuesto, p.precio_gerente_com_min
+        SELECT s.estado, s.nivel_solicitante, s.precio_propuesto, p.precio_gerente_com_min, p.precio_subdireccion_min, p.precio_direccion_min
         FROM SolicitudesAutorizacion s
         INNER JOIN PreciosCalculados p ON s.sku = p.sku AND s.transporte = p.transporte
         WHERE s.id = ?
@@ -588,7 +589,9 @@ def rechazar_solicitud(
     nivel_solicitante = row[1]
     precio_propuesto = row[2]
     precio_gerente_com_min = row[3]
-    
+    precio_subdireccion_min = row[4]
+    precio_direccion_min = row[5]
+
     if current_user["rol"] == 'Gerencia_Comercial':
         if nivel_solicitante != 'Vendedor':
             raise HTTPException(
@@ -612,7 +615,7 @@ def rechazar_solicitud(
                 status_code=403,
                 detail="Subdirección solo puede rechazar solicitudes de Vendedor o Gerencia_Comercial"
             )
-    # Direccion y admin pueden rechazar cualquier solicitud
+    # Direccion y admin: sin restricción
     
     # Rechazar solicitud
     cursor.execute("""
