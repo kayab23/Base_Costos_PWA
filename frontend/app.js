@@ -173,6 +173,14 @@ selectors.connectBtn.addEventListener('click', async () => {
         
         showToast('Inicio de sesión exitoso.', 'success');
         console.log('Autenticación exitosa');
+        // Ocultar historial de aprobaciones si es Vendedor
+        if (state.userRole === 'Vendedor') {
+            const aprobacionesSection = document.getElementById('procesadas-section');
+            if (aprobacionesSection) aprobacionesSection.style.display = 'none';
+        } else {
+            const aprobacionesSection = document.getElementById('procesadas-section');
+            if (aprobacionesSection) aprobacionesSection.style.display = '';
+        }
     } catch (error) {
         console.error('Error en autenticación:', error);
         selectors.status.textContent = `Error: ${error.message}`;
