@@ -436,6 +436,7 @@ def obtener_solicitudes_pendientes(
 
 @router.put("/{solicitud_id}/aprobar", response_model=schemas.SolicitudAutorizacion)
 def aprobar_solicitud(
+        logger.info(f"Aprobar solicitud: usuario={current_user['username']} rol={current_user['rol']}")
     solicitud_id: int,
     respuesta: schemas.SolicitudAutorizacionResponse,
     current_user: schemas.UserInfo = Depends(get_current_user),
