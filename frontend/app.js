@@ -1,3 +1,18 @@
+// --- Logout logic ---
+const logoutBtn = document.getElementById('logout-btn');
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+        state.auth = null;
+        state.userRole = null;
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userRole');
+        selectors.status.textContent = 'Sesión cerrada correctamente.';
+        selectors.userRole.style.display = 'none';
+        selectors.connectBtn.style.display = '';
+        logoutBtn.style.display = 'none';
+        showToast('Sesión cerrada.', 'success');
+    });
+}
 // --- Toast Notification System ---
 function showToast(message, type = 'info', duration = 3500) {
     let toast = document.createElement('div');
@@ -91,6 +106,8 @@ selectors.connectBtn.addEventListener('click', async () => {
     console.log('Botón clickeado');
     try {
         selectors.status.textContent = 'Conectando...';
+        selectors.connectBtn.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = '';
         state.baseUrl = selectors.apiUrl.value.trim();
         const username = selectors.username.value.trim();
         const password = selectors.password.value;
@@ -133,6 +150,8 @@ selectors.connectBtn.addEventListener('click', async () => {
         selectors.status.textContent = `Conectado. ${state.productos.length} productos cargados.`;
         selectors.userRole.textContent = `Rol: ${state.userRole}`;
         selectors.userRole.style.display = 'block';
+        selectors.connectBtn.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = '';
         
         // Actualizar interfaz según rol
         updateUIForRole();
@@ -146,6 +165,8 @@ selectors.connectBtn.addEventListener('click', async () => {
         state.auth = null;
         localStorage.removeItem('authToken');
         localStorage.removeItem('userRole');
+        selectors.connectBtn.style.display = '';
+        if (logoutBtn) logoutBtn.style.display = 'none';
     }
 });
 

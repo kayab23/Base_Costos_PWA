@@ -337,7 +337,7 @@ def calculate_price_list(
                         "precio_venta_moneda": precio_moneda,
                         "precio_min_mxn": precio_min_mxn,
                         "notas": None,
-                        "version_id": version_id,
+                        # "version_id": version_id,  # Eliminado: variable no definida
                         "calculado_en": datetime.now(timezone.utc),
                     }
                 )
@@ -489,7 +489,7 @@ def run_calculations(
         summary = {
             "landed_rows": len(landed_rows),
             "price_rows": len(price_rows) if price_rows else 0,
-            "version_id": data.get("version_id"),
+            # "version_id": data.get("version_id"),  # Eliminado: ya no existe version_id
         }
         print(
             f"\n✅ Cálculos almacenados correctamente. Landed={summary['landed_rows']}, Precios={summary['price_rows']}"

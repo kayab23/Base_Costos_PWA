@@ -7,13 +7,14 @@ param(
 
 Write-Host "🚀 Iniciando deployment para ambiente: $Environment" -ForegroundColor Green
 
-# 1. Verificar dependencias
-Write-Host "`n1️⃣ Verificando dependencias..." -ForegroundColor Cyan
-pip list | Select-String "fastapi|uvicorn|pyodbc|bcrypt|openpyxl"
 
-# 2. Ejecutar tests
-Write-Host "`n2️⃣ Ejecutando tests..." -ForegroundColor Cyan
-pytest tests/ -v
+# 1. Verificar dependencias usando el entorno virtual
+Write-Host "`n1️⃣ Verificando dependencias (.venv)..." -ForegroundColor Cyan
+& .venv\Scripts\python.exe -m pip list | Select-String "fastapi|uvicorn|pyodbc|bcrypt|openpyxl"
+
+# 2. Ejecutar tests usando el entorno virtual
+Write-Host "`n2️⃣ Ejecutando tests (.venv)..." -ForegroundColor Cyan
+& .venv\Scripts\python.exe -m pytest tests/ -v
 if ($LASTEXITCODE -ne 0) {
     Write-Host "❌ Tests fallaron. Abortando deployment." -ForegroundColor Red
     exit 1
@@ -39,4 +40,4 @@ docker-compose down
 docker-compose up -d --build
 
 Write-Host "`n✅ Deployment completado exitosamente!" -ForegroundColor Green
-Write-Host "📊 Verificar en: http://localhost:8000/health" -ForegroundColor Yellow
+Write-Host "Verificar en: http://localhost:8000/health" -ForegroundColor Yellow
