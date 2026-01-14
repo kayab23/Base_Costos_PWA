@@ -496,14 +496,21 @@ def aprobar_solicitud(
     # admin puede aprobar cualquier solicitud (no hay restricción)
     
     # Aprobar solicitud
-    cursor.execute("""
-        UPDATE SolicitudesAutorizacion
-        SET estado = 'Aprobada',
-            autorizador_id = ?,
-            fecha_respuesta = GETDATE(),
-            comentarios_autorizador = ?
-        WHERE id = ?
-    """, (current_user["usuario_id"], respuesta.comentarios, solicitud_id))
+    # Validar que comentarios_autorizador nunca sea None
+    comentario_final = respuesta.comentarios if respuesta.comentarios is not None else "Aprobado sin comentarios"
+    try:
+        cursor.execute("""
+            UPDATE SolicitudesAutorizacion
+            SET estado = 'Aprobada',
+                autorizador_id = ?,
+                fecha_respuesta = GETDATE(),
+                comentarios_autorizador = ?
+            WHERE id = ?
+        """, (current_user["usuario_id"], comentario_final, solicitud_id))
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Error al aprobar solicitud: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al aprobar solicitud: {e}")
     
     conn.commit()
     
