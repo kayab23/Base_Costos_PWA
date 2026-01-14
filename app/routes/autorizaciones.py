@@ -443,7 +443,7 @@ def aprobar_solicitud(
 ):
     """Aprobar una solicitud de autorización"""
     
-    if current_user["rol"] not in ['Gerencia_Comercial', 'Gerencia', 'admin']:
+    if current_user["rol"] not in ['Gerencia_Comercial', 'Gerencia', 'Subdireccion', 'Direccion', 'admin']:
         raise HTTPException(status_code=403, detail="No tiene permisos para aprobar solicitudes")
     
     cursor = conn.cursor()
@@ -472,10 +472,11 @@ def aprobar_solicitud(
     # Jerarquía de aprobación:
     # - Gerencia_Comercial puede aprobar solicitudes de Vendedor con precio >= precio_gerente_com_min
     # - Gerencia puede aprobar solicitudes de Vendedor (cualquier precio) y de Gerencia_Comercial
+    # - Subdireccion puede aprobar solicitudes de Vendedor y Gerencia_Comercial (cualquier precio)
+    # - Direccion puede aprobar cualquier solicitud
     # - admin puede aprobar cualquier solicitud
-    
+
     if current_user["rol"] == 'Gerencia_Comercial':
-        # Solo puede aprobar solicitudes de Vendedor con precio en su rango
         if nivel_solicitante != 'Vendedor':
             raise HTTPException(
                 status_code=403,
@@ -487,13 +488,18 @@ def aprobar_solicitud(
                 detail="El precio propuesto está por debajo de su nivel de autorización. Debe ser aprobado por Gerencia"
             )
     elif current_user["rol"] == 'Gerencia':
-        # Puede aprobar solicitudes de Vendedor y Gerencia_Comercial
         if nivel_solicitante not in ['Vendedor', 'Gerencia_Comercial']:
             raise HTTPException(
                 status_code=403,
                 detail="No tiene autoridad para aprobar esta solicitud"
             )
-    # admin puede aprobar cualquier solicitud (no hay restricción)
+    elif current_user["rol"] == 'Subdireccion':
+        if nivel_solicitante not in ['Vendedor', 'Gerencia_Comercial']:
+            raise HTTPException(
+                status_code=403,
+                detail="Subdirección solo puede aprobar solicitudes de Vendedor o Gerencia_Comercial"
+            )
+    # Direccion y admin pueden aprobar cualquier solicitud
     
     # Aprobar solicitud
     # Validar que comentarios_autorizador nunca sea None
@@ -557,7 +563,7 @@ def rechazar_solicitud(
 ):
     """Rechazar una solicitud de autorización"""
     
-    if current_user["rol"] not in ['Gerencia_Comercial', 'Gerencia', 'admin']:
+    if current_user["rol"] not in ['Gerencia_Comercial', 'Gerencia', 'Subdireccion', 'Direccion', 'admin']:
         raise HTTPException(status_code=403, detail="No tiene permisos para rechazar solicitudes")
     
     cursor = conn.cursor()
@@ -584,7 +590,6 @@ def rechazar_solicitud(
     precio_gerente_com_min = row[3]
     
     if current_user["rol"] == 'Gerencia_Comercial':
-        # Solo puede rechazar solicitudes de Vendedor con precio en su rango
         if nivel_solicitante != 'Vendedor':
             raise HTTPException(
                 status_code=403,
@@ -596,13 +601,18 @@ def rechazar_solicitud(
                 detail="El precio propuesto está por debajo de su nivel de autorización. Debe ser procesado por Gerencia"
             )
     elif current_user["rol"] == 'Gerencia':
-        # Puede rechazar solicitudes de Vendedor y Gerencia_Comercial
         if nivel_solicitante not in ['Vendedor', 'Gerencia_Comercial']:
             raise HTTPException(
                 status_code=403,
                 detail="No tiene autoridad para rechazar esta solicitud"
             )
-    # admin puede rechazar cualquier solicitud (no hay restricción)
+    elif current_user["rol"] == 'Subdireccion':
+        if nivel_solicitante not in ['Vendedor', 'Gerencia_Comercial']:
+            raise HTTPException(
+                status_code=403,
+                detail="Subdirección solo puede rechazar solicitudes de Vendedor o Gerencia_Comercial"
+            )
+    # Direccion y admin pueden rechazar cualquier solicitud
     
     # Rechazar solicitud
     cursor.execute("""
