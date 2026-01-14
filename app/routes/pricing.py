@@ -122,4 +122,15 @@ def get_listas_precios(
         query += " AND p.transporte = ?"
         params.append(transporte)
     query += " ORDER BY p.sku, p.transporte"
-    return fetch_all(cursor, query, params)
+    resultados = fetch_all(cursor, query, params)
+    # Si el usuario es Vendedor, ocultar campos de costos
+    if user["rol"] == "Vendedor":
+        for r in resultados:
+            r["costo_base_mxn"] = None
+            r["flete_pct"] = None
+            r["seguro_pct"] = None
+            r["arancel_pct"] = None
+            r["dta_pct"] = None
+            r["honorarios_aduanales_pct"] = None
+            r["landed_cost_mxn"] = None
+    return resultados

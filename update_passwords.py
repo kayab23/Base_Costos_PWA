@@ -4,13 +4,18 @@ Script para actualizar contraseñas de usuarios según la jerarquía definida
 """
 import sys
 import pyodbc
-import bcrypt
+
 from app.config import settings
+from app.security import hash_password
 
 def update_password(username: str, new_password: str):
-    """Actualiza la contraseña de un usuario"""
-    password_hash = bcrypt.hashpw(new_password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-    
+    """Actualiza la contraseña de un usuario usando el mismo hash que el backend"""
+    # Asegurar que la contraseña es un string simple y no una tupla ni bytes
+    if not isinstance(new_password, str):
+        new_password = str(new_password)
+    # Debug: imprimir tipo y longitud
+    print(f"Actualizando {username}: tipo={type(new_password)}, len={len(new_password)}")
+    password_hash = hash_password(new_password)
     conn_str = settings.sqlserver_conn
     with pyodbc.connect(conn_str) as conn:
         cursor = conn.cursor()

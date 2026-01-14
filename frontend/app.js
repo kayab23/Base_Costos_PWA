@@ -690,8 +690,13 @@ async function loadProcesadas() {
         const solicitudes = await apiFetch('/autorizaciones/procesadas');
         const tbody = document.querySelector('#procesadas-table tbody');
         
+        const role = state.userRole || '';
         if (!solicitudes || solicitudes.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: var(--muted);">No has procesado solicitudes</td></tr>';
+            let msg = 'No has procesado solicitudes';
+            if (["admin", "Direccion", "Subdireccion"].includes(role)) {
+                msg = 'No hay solicitudes procesadas en el sistema';
+            }
+            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color: var(--muted);">${msg}</td></tr>`;
             return;
         }
         
@@ -770,3 +775,20 @@ if (state.auth) {
 //         navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('SW error', err));
 //     });
 // }
+
+// --- Timeout de sesión por inactividad ---
+let lastActivity = Date.now();
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutos
+
+document.addEventListener('click', () => lastActivity = Date.now());
+document.addEventListener('keypress', () => lastActivity = Date.now());
+
+setInterval(() => {
+    if (state.auth && Date.now() - lastActivity > SESSION_TIMEOUT) {
+        alert('Sesión expirada por inactividad. Por favor, inicia sesión nuevamente.');
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userRole');
+        window.location.reload();
+    }
+}, 60000);
+// --- Fin timeout de sesión ---

@@ -27,6 +27,7 @@ from typing import List, Optional
 from .. import schemas, db
 from ..auth import get_current_user
 from datetime import datetime
+from ..logger import logger
 
 router = APIRouter(prefix="/autorizaciones", tags=["autorizaciones"])
 
@@ -180,8 +181,9 @@ def crear_solicitud(
         descuento_adicional_pct,
         solicitud.cliente,
         solicitud.cantidad,
-        solicitud.justificacion
+        solicitud.justificacion,
     ))
+    logger.info(f"Solicitud creada: usuario={current_user['username']} sku={solicitud.sku} precio={solicitud.precio_propuesto} nivel_autorizador={nivel_autorizador}")
     
     # Obtener ID de la solicitud creada
     cursor.execute("SELECT @@IDENTITY")
@@ -279,15 +281,27 @@ def obtener_solicitudes_procesadas(
     
     cursor = conn.cursor()
     
-    cursor.execute("""
-        SELECT id, sku, transporte, solicitante_id, solicitante, nivel_solicitante,
-               precio_propuesto, precio_minimo_actual, descuento_adicional_pct,
-               cliente, cantidad, justificacion, estado, autorizador_id, autorizador,
-               fecha_solicitud, fecha_respuesta, comentarios_autorizador
-        FROM vw_SolicitudesAutorizacion
-        WHERE autorizador_id = ? AND estado IN ('Aprobada', 'Rechazada')
-        ORDER BY fecha_respuesta DESC
-    """, (current_user["usuario_id"],))
+    # Para admin, dirección y subdirección, mostrar todas las procesadas
+    if current_user["rol"] in ["admin", "Direccion", "Subdireccion"]:
+        cursor.execute("""
+            SELECT id, sku, transporte, solicitante_id, solicitante, nivel_solicitante,
+                   precio_propuesto, precio_minimo_actual, descuento_adicional_pct,
+                   cliente, cantidad, justificacion, estado, autorizador_id, autorizador,
+                   fecha_solicitud, fecha_respuesta, comentarios_autorizador
+            FROM vw_SolicitudesAutorizacion
+            WHERE estado IN ('Aprobada', 'Rechazada')
+            ORDER BY fecha_respuesta DESC
+        """)
+    else:
+        cursor.execute("""
+            SELECT id, sku, transporte, solicitante_id, solicitante, nivel_solicitante,
+                   precio_propuesto, precio_minimo_actual, descuento_adicional_pct,
+                   cliente, cantidad, justificacion, estado, autorizador_id, autorizador,
+                   fecha_solicitud, fecha_respuesta, comentarios_autorizador
+            FROM vw_SolicitudesAutorizacion
+            WHERE autorizador_id = ? AND estado IN ('Aprobada', 'Rechazada')
+            ORDER BY fecha_respuesta DESC
+        """, (current_user["usuario_id"],))
     
     solicitudes = []
     for row in cursor.fetchall():
@@ -418,7 +432,8 @@ def aprobar_solicitud(
     if not row:
         raise HTTPException(status_code=404, detail="Solicitud no encontrada")
     
-    if row[11] != 'Pendiente':  # estado (índice 11 = columna 12)
+    # estado (índice 11 = columna 12)
+    if row[11] != 'Pendiente':
         raise HTTPException(status_code=400, detail="La solicitud ya fue procesada")
     
     # Validar que el usuario tiene nivel suficiente para aprobar
@@ -475,6 +490,7 @@ def aprobar_solicitud(
     """, (solicitud_id,))
     
     row = cursor.fetchone()
+    logger.info(f"Solicitud aprobada: usuario={current_user['username']} id={solicitud_id} comentario={respuesta.comentario}")
     return schemas.SolicitudAutorizacion(
         id=row[0],
         sku=row[1],
@@ -576,6 +592,7 @@ def rechazar_solicitud(
     """, (solicitud_id,))
     
     row = cursor.fetchone()
+    logger.info(f"Solicitud rechazada: usuario={current_user['username']} id={solicitud_id} comentario={respuesta.comentario}")
     return schemas.SolicitudAutorizacion(
         id=row[0],
         sku=row[1],
