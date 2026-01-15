@@ -165,11 +165,13 @@ def crear_solicitud(
     """Crear una solicitud de autorización de descuento"""
     
     # Validar que el usuario tenga un rol que pueda solicitar autorizaciones
-    if current_user["rol"] not in ['Vendedor', 'Gerencia_Comercial', 'Subdireccion']:
-        logger.error(f"Intento de solicitud no autorizado: usuario={current_user['username']}, rol={current_user['rol']}")
+    rol_normalizado = current_user["rol"].replace(' ', '').lower()
+    roles_permitidos = ['vendedor', 'gerencia_comercial', 'subdireccion']
+    if rol_normalizado not in roles_permitidos:
+        logger.error(f"Intento de solicitud no autorizado: usuario={current_user['username']}, rol={current_user['rol']} (normalizado={rol_normalizado})")
         raise HTTPException(
             status_code=403,
-            detail="No tienes permisos para solicitar autorizaciones.",
+            detail=f"No tienes permisos para solicitar autorizaciones. Rol recibido: {current_user['rol']} (normalizado={rol_normalizado})",
             headers={"X-Help": "Solo Vendedores, Gerencia Comercial y Subdirección pueden solicitar autorizaciones."}
         )
     
@@ -253,6 +255,8 @@ def obtener_mis_solicitudes(
     conn = Depends(db.get_connection)
 ):
     """Obtener las solicitudes del usuario actual"""
+    rol_normalizado = current_user["rol"].replace(' ', '').lower()
+    logger.warning(f"[DEBUG-AUTORIZACIONES] Endpoint: mis-solicitudes | usuario={getattr(current_user, 'username', current_user.get('username', 'N/A'))} rol={current_user['rol']} (normalizado={rol_normalizado})")
     cursor = conn.cursor()
     
     cursor.execute("""
@@ -307,6 +311,8 @@ def obtener_solicitudes_procesadas(
             headers={"X-Help": "Solicita acceso al administrador si necesitas consultar este historial."}
         )
     
+    rol_normalizado = current_user["rol"].replace(' ', '').lower()
+    logger.warning(f"[DEBUG-AUTORIZACIONES] Endpoint: procesadas | usuario={getattr(current_user, 'username', current_user.get('username', 'N/A'))} rol={current_user['rol']} (normalizado={rol_normalizado})")
     cursor = conn.cursor()
     
     # Para admin, dirección y subdirección, mostrar todas las procesadas
@@ -365,8 +371,11 @@ def obtener_solicitudes_pendientes(
     """Obtener solicitudes pendientes que el usuario puede autorizar"""
     
     # Solo roles autorizadores pueden ver solicitudes pendientes
-    if current_user["rol"] not in ['Gerencia_Comercial', 'Subdireccion', 'Direccion', 'admin']:
-        raise HTTPException(status_code=403, detail="No tiene permisos para ver solicitudes pendientes")
+        rol_normalizado = current_user["rol"].replace(' ', '').lower()
+        logger.warning(f"[DEBUG-AUTORIZACIONES] Endpoint: pendientes | usuario={getattr(current_user, 'username', current_user.get('username', 'N/A'))} rol={current_user['rol']} (normalizado={rol_normalizado})")
+        roles_permitidos = ['gerencia_comercial', 'subdireccion', 'direccion', 'admin']
+        if rol_normalizado not in roles_permitidos:
+            raise HTTPException(status_code=403, detail=f"No tiene permisos para ver solicitudes pendientes. Rol recibido: {current_user['rol']} (normalizado={rol_normalizado})")
     
     cursor = conn.cursor()
     
@@ -436,16 +445,18 @@ def obtener_solicitudes_pendientes(
 
 @router.put("/{solicitud_id}/aprobar", response_model=schemas.SolicitudAutorizacion)
 def aprobar_solicitud(
-        logger.info(f"Aprobar solicitud: usuario={current_user['username']} rol={current_user['rol']}")
     solicitud_id: int,
     respuesta: schemas.SolicitudAutorizacionResponse,
     current_user: schemas.UserInfo = Depends(get_current_user),
     conn = Depends(db.get_connection)
 ):
     """Aprobar una solicitud de autorización"""
-    
-    if current_user["rol"] not in ['Gerencia_Comercial', 'Gerencia', 'Subdireccion', 'Direccion', 'admin']:
-        raise HTTPException(status_code=403, detail="No tiene permisos para aprobar solicitudes")
+    # Normalizar rol: quitar espacios y pasar a minúsculas
+    rol_normalizado = current_user["rol"].replace(' ', '').lower()
+    logger.warning(f"[DEBUG-APROBAR] usuario={current_user['username']} rol={current_user['rol']} (normalizado={rol_normalizado}) id={solicitud_id}")
+    roles_permitidos = ['gerencia_comercial', 'gerencia', 'subdireccion', 'direccion', 'admin']
+    if rol_normalizado not in roles_permitidos:
+        raise HTTPException(status_code=403, detail=f"No tiene permisos para aprobar solicitudes. Rol recibido: {current_user['rol']} (normalizado={rol_normalizado})")
     
     cursor = conn.cursor()
     
@@ -533,7 +544,7 @@ def aprobar_solicitud(
     """, (solicitud_id,))
     
     row = cursor.fetchone()
-    logger.info(f"Solicitud aprobada: usuario={current_user['username']} id={solicitud_id} comentario={respuesta.comentario}")
+        logger.info(f"Solicitud aprobada: usuario={current_user['username']} id={solicitud_id} comentario={respuesta.comentarios}")
     return schemas.SolicitudAutorizacion(
         id=row[0],
         sku=row[1],
@@ -641,7 +652,7 @@ def rechazar_solicitud(
     """, (solicitud_id,))
     
     row = cursor.fetchone()
-    logger.info(f"Solicitud rechazada: usuario={current_user['username']} id={solicitud_id} comentario={respuesta.comentario}")
+    logger.info(f"Solicitud rechazada: usuario={current_user['username']} id={solicitud_id} comentario={respuesta.comentarios}")
     return schemas.SolicitudAutorizacion(
         id=row[0],
         sku=row[1],

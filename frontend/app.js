@@ -814,13 +814,12 @@ async function loadProcesadas() {
 async function aprobarSolicitud(id) {
     const comentarios = prompt('Comentarios (opcional):');
     if (comentarios === null) return; // Usuario canceló
-    
     try {
+        console.log('AprobarSolicitud: method=PUT, Authorization:', state.auth);
         await apiFetch(`/autorizaciones/${id}/aprobar`, {
             method: 'PUT',
             body: JSON.stringify({ comentarios })
         });
-        
         alert('✅ Solicitud aprobada');
         loadPendientes();
         loadProcesadas();
@@ -833,13 +832,12 @@ async function aprobarSolicitud(id) {
 async function rechazarSolicitud(id) {
     const comentarios = prompt('Motivo del rechazo (opcional):');
     if (comentarios === null) return; // Usuario canceló
-    
     try {
+        console.log('RechazarSolicitud: method=PUT, Authorization:', state.auth);
         await apiFetch(`/autorizaciones/${id}/rechazar`, {
             method: 'PUT',
             body: JSON.stringify({ comentarios })
         });
-        
         alert('❌ Solicitud rechazada');
         loadPendientes();
         loadProcesadas();

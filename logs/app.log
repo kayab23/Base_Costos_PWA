@@ -1,0 +1,6 @@
+2026-01-14 12:32:39,505 - INFO - Solicitud creada: usuario=vendedor1 sku=HP30B-CTO-01 precio=17000.0 nivel_autorizador=Gerencia_Comercial
+2026-01-14 12:32:48,142 - ERROR - Acceso denegado a historial: usuario=vendedor1, rol=Vendedor
+2026-01-14 13:16:37,684 - INFO - Solicitud creada: usuario=vendedor1 sku=1199-00042-01 precio=40000.0 nivel_autorizador=Gerencia_Comercial
+2026-01-14 13:16:43,047 - ERROR - Acceso denegado a historial: usuario=vendedor1, rol=Vendedor
+2026-01-14 13:27:43,025 - INFO - Solicitud creada: usuario=vendedor1 sku=HP30B-CTO-01 precio=12500.0 nivel_autorizador=Gerencia_Comercial
+2026-01-14 18:15:27,195 - INFO - Solicitud creada: usuario=vendedor1 sku=1199-00046-01 precio=3800.0 nivel_autorizador=Gerencia_Comercial

@@ -23,6 +23,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
 from .routes import catalog, pricing, auth, autorizaciones
+from .logger import logger
 
 # Inicializar aplicación FastAPI con configuración desde settings
 app = FastAPI(title=settings.api_title, version=settings.api_version)
@@ -76,11 +77,14 @@ def healthcheck():
     }
 
 
-# Middleware para contar peticiones y errores
+
+# Middleware para contar peticiones y errores y loguear headers y auth
 @app.middleware("http")
-async def metrics_middleware(request, call_next):
+async def debug_and_metrics_middleware(request, call_next):
     with metrics_lock:
         metrics['requests_total'] += 1
+    # Log headers y path
+    logger.warning(f"[DEBUG-MIDDLEWARE] path={request.url.path} headers={{'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}}")
     try:
         response = await call_next(request)
         return response
