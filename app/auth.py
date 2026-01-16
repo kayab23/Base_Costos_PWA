@@ -22,51 +22,37 @@ Roles soportados:
 """
 from __future__ import annotations
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.security import OAuth2PasswordBearer
 
 from .db import fetch_one, get_connection
 from .security import verify_password
-
-# Objeto de seguridad HTTP Basic para extraer credenciales del header
-security = HTTPBasic()
+from .jwt_utils import create_access_token, decode_access_token
 
 
-def get_current_user(
-    credentials: HTTPBasicCredentials = Depends(security),
-    conn=Depends(get_connection),
-):
-    """Valida las credenciales del usuario y retorna sus datos.
-    
-    Esta función se usa como dependencia en endpoints protegidos.
-    
-    Args:
-        credentials: Credenciales extraídas del header Authorization
-        conn: Conexión a base de datos (inyectada automáticamente)
-    
-    Returns:
-        dict: Datos del usuario autenticado con keys:
-            - usuario_id: ID numérico en la tabla Usuarios
-            - username: Nombre de usuario
-            - rol: Rol jerárquico (Vendedor, Gerencia_Comercial, etc.)
-    
-    Raises:
-        HTTPException 401: Si usuario no existe, está inactivo, o password incorrecto
-    """
+# OAuth2PasswordBearer para JWT
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+
+
+
+# Nuevo get_current_user para JWT
+async def get_current_user(token: str = Depends(oauth2_scheme), conn=Depends(get_connection)):
+    payload = decode_access_token(token)
+    if not payload:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido o expirado")
     cursor = conn.cursor()
     user = fetch_one(
         cursor,
         """
-        SELECT usuario_id, username, password_hash, rol, es_activo
+        SELECT usuario_id, username, rol, es_activo
         FROM dbo.Usuarios
-        WHERE username = ?
+        WHERE usuario_id = ?
         """,
-        [credentials.username],
+        [payload.get("usuario_id")],
     )
     if not user or not user["es_activo"]:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado")
-    if not verify_password(credentials.password, user["password_hash"]):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado o inactivo")
     return {
         "usuario_id": user["usuario_id"],
         "username": user["username"],

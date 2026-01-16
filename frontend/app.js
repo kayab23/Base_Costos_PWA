@@ -95,7 +95,7 @@ async function apiFetch(path, options = {}) {
         ...options,
         headers: {
             'Content-Type': 'application/json',
-            Authorization: `Basic ${state.auth}`,
+            Authorization: `Bearer ${state.auth}`,
             ...(options.headers || {}),
         },
     });
@@ -123,10 +123,10 @@ async function apiFetch(path, options = {}) {
 }
 
 selectors.connectBtn.addEventListener('click', async () => {
-            // Mostrar todas las secciones tras login
-            document.querySelectorAll('.card').forEach(card => {
-                card.style.display = '';
-            });
+    // Mostrar todas las secciones tras login
+    document.querySelectorAll('.card').forEach(card => {
+        card.style.display = '';
+    });
     console.log('Botón clickeado');
     try {
         selectors.status.textContent = 'Conectando...';
@@ -135,54 +135,55 @@ selectors.connectBtn.addEventListener('click', async () => {
         state.baseUrl = selectors.apiUrl.value.trim();
         const username = selectors.username.value.trim();
         const password = selectors.password.value;
-        
+
         console.log('URL:', state.baseUrl);
         console.log('Usuario:', username);
-        
+
+        // Health check antes de login
+        const healthResp = await fetch(`${state.baseUrl}/health`);
+        if (!healthResp.ok) {
+            throw new Error('No se pudo conectar al backend. Verifica la URL y que el backend esté corriendo.');
+        }
+
         if (!username || !password) {
             selectors.status.textContent = 'Ingrese usuario y contraseña';
+            selectors.connectBtn.style.display = '';
             return;
         }
-        
-        const token = btoa(`${username}:${password}`);
-        state.auth = token;
-        
-        // Primero probar la conexión
-        console.log('Probando conexión...');
-        const testResponse = await fetch(`${state.baseUrl}/health`);
-        console.log('Respuesta health:', testResponse.status);
-        
-        if (!testResponse.ok) {
-            throw new Error('No se puede conectar al servidor');
+
+        // Login JWT
+        const loginResponse = await fetch(`${state.baseUrl}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ username, password })
+        });
+        if (!loginResponse.ok) {
+            const err = await loginResponse.json().catch(() => ({}));
+            throw new Error(err.detail || 'Credenciales inválidas');
         }
-        
-        // Luego intentar autenticar y obtener datos de usuario
-        console.log('Cargando productos...');
+        const { access_token } = await loginResponse.json();
+        state.auth = access_token;
+        localStorage.setItem('authToken', access_token);
+
+        // Obtener productos y rol
         await loadProductos();
         showToast('Productos cargados correctamente.', 'success');
-        
-        // Obtener información del usuario incluyendo rol
-        console.log('Obteniendo información del usuario...');
         const userInfo = await apiFetch('/auth/me');
         state.userRole = userInfo.rol;
         localStorage.setItem('userRole', userInfo.rol);
-        
-        // Si todo salió bien, guardar credenciales
+
         localStorage.setItem('apiUrl', state.baseUrl);
-        localStorage.setItem('authToken', token);
-        
         selectors.status.textContent = `Conectado. ${state.productos.length} productos cargados.`;
         selectors.userRole.textContent = `Rol: ${state.userRole}`;
+        console.log('[LOGIN] Rol recibido:', state.userRole);
         selectors.userRole.style.display = 'block';
+        console.log('[LOGIN] #user-role display:', selectors.userRole.style.display);
         selectors.connectBtn.style.display = 'none';
         if (logoutBtn) logoutBtn.style.display = '';
-        
-        // Actualizar interfaz según rol
+
         updateUIForRole();
-        
         showToast('Inicio de sesión exitoso.', 'success');
         console.log('Autenticación exitosa');
-        // Ocultar historial de aprobaciones si es Vendedor
         if (state.userRole === 'Vendedor') {
             const aprobacionesSection = document.getElementById('procesadas-section');
             if (aprobacionesSection) aprobacionesSection.style.display = 'none';

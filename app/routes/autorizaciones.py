@@ -104,7 +104,7 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
         raise HTTPException(
             status_code=400,
             detail=f"El precio propuesto (${precio_propuesto:,.2f}) no puede ser menor al precio base (${precio_base:,.2f}).",
-            headers={"X-Help": "Ajusta el precio propuesto o consulta los precios mínimos autorizados."}
+            headers={"X-Help": "Ajusta el precio propuesto o consulta los precios minimos autorizados."}
         )
     
     # Determinar nivel autorizador según el nivel del solicitante
@@ -119,8 +119,8 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
             logger.info(f"Solicitud innecesaria: usuario_nivel=Vendedor, sku={sku}, propuesto={precio_propuesto}, min={precio_vendedor_min}")
             raise HTTPException(
                 status_code=400,
-                detail=f"El precio propuesto (${precio_propuesto:,.2f}) está dentro de tu rango autorizado (≥${precio_vendedor_min:,.2f}). No necesitas autorización.",
-                headers={"X-Help": "Puedes vender a este precio sin autorización adicional."}
+                detail=f"El precio propuesto (${precio_propuesto:,.2f}) esta dentro de tu rango autorizado (≥${precio_vendedor_min:,.2f}). No necesitas autorizacion.",
+                headers={"X-Help": "Puedes vender a este precio sin autorizacion adicional."}
             )
     
     elif nivel_solicitante == 'Gerencia_Comercial':
@@ -131,7 +131,7 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
             logger.info(f"Solicitud innecesaria: usuario_nivel=Gerencia_Comercial, sku={sku}, propuesto={precio_propuesto}, min={precio_gerente_com_min}")
             raise HTTPException(
                 status_code=400,
-                detail=f"El precio propuesto (${precio_propuesto:,.2f}) está dentro de tu rango autorizado (≥${precio_gerente_com_min:,.2f}). No necesitas autorización.",
+                detail=f"El precio propuesto (${precio_propuesto:,.2f}) esta dentro de tu rango autorizado (≥${precio_gerente_com_min:,.2f}). No necesitas autorizacion.",
                 headers={"X-Help": "Puedes autorizar este precio sin escalamiento adicional."}
             )
     
@@ -143,7 +143,7 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
             logger.info(f"Solicitud innecesaria: usuario_nivel=Subdireccion, sku={sku}, propuesto={precio_propuesto}, min={precio_subdireccion_min}")
             raise HTTPException(
                 status_code=400,
-                detail=f"El precio propuesto (${precio_propuesto:,.2f}) está dentro de tu rango autorizado (≥${precio_subdireccion_min:,.2f}). No necesitas autorización.",
+                detail=f"El precio propuesto (${precio_propuesto:,.2f}) esta dentro de tu rango autorizado (≥${precio_subdireccion_min:,.2f}). No necesitas autorizacion.",
                 headers={"X-Help": "Puedes autorizar este precio sin escalamiento adicional."}
             )
     
@@ -170,9 +170,9 @@ def crear_solicitud(
     if rol_normalizado not in roles_permitidos:
         logger.error(f"Intento de solicitud no autorizado: usuario={current_user['username']}, rol={current_user['rol']} (normalizado={rol_normalizado})")
         raise HTTPException(
-            status_code=403,
+            status_code=400,
             detail=f"No tienes permisos para solicitar autorizaciones. Rol recibido: {current_user['rol']} (normalizado={rol_normalizado})",
-            headers={"X-Help": "Solo Vendedores, Gerencia Comercial y Subdirección pueden solicitar autorizaciones."}
+            headers={"X-Help": "Solo Vendedores, Gerencia Comercial y Subdireccion pueden solicitar autorizaciones."}
         )
     
     # Determinar nivel autorizador y precio mínimo actual
@@ -306,7 +306,7 @@ def obtener_solicitudes_procesadas(
     if current_user["rol"] not in ['Gerencia_Comercial', 'Subdireccion', 'Direccion', 'admin']:
         logger.error(f"Acceso denegado a historial: usuario={current_user['username']}, rol={current_user['rol']}")
         raise HTTPException(
-            status_code=403,
+            status_code=400,
             detail="No tienes permisos para ver el historial de aprobaciones.",
             headers={"X-Help": "Solicita acceso al administrador si necesitas consultar este historial."}
         )
