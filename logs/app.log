@@ -4,3 +4,107 @@
 2026-01-14 13:16:43,047 - ERROR - Acceso denegado a historial: usuario=vendedor1, rol=Vendedor
 2026-01-14 13:27:43,025 - INFO - Solicitud creada: usuario=vendedor1 sku=HP30B-CTO-01 precio=12500.0 nivel_autorizador=Gerencia_Comercial
 2026-01-14 18:15:27,195 - INFO - Solicitud creada: usuario=vendedor1 sku=1199-00046-01 precio=3800.0 nivel_autorizador=Gerencia_Comercial
+2026-01-15 14:45:13,706 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:45:28,699 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:45:43,697 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:45:58,697 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:46:13,697 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:46:28,697 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:46:43,694 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:46:58,696 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:47:13,691 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:47:28,692 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:47:43,690 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:47:58,690 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:48:13,688 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:48:28,689 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:48:43,687 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:48:58,687 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:49:13,687 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:49:28,685 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:49:43,685 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:49:58,685 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:50:13,683 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:50:58,686 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:51:13,680 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:51:28,680 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:51:43,679 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 14:51:58,677 - WARNING - [DEBUG-MIDDLEWARE] path=/metrics headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:21:09,950 - WARNING - [DEBUG-MIDDLEWARE] path=/health headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:21:10,063 - WARNING - [DEBUG-MIDDLEWARE] path=/catalog/productos headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:21:10,064 - WARNING - [DEBUG-MIDDLEWARE] path=/catalog/productos headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:21:10,315 - WARNING - [DEBUG-MIDDLEWARE] path=/auth/me headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:21:10,317 - WARNING - [DEBUG-MIDDLEWARE] path=/auth/me headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:21:10,533 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/pendientes headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:21:10,533 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/procesadas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:21:10,536 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/pendientes headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:21:10,537 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/procesadas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:21:10,739 - WARNING - [DEBUG-AUTORIZACIONES] Endpoint: pendientes | usuario=admin rol=admin (normalizado=admin)
+2026-01-15 15:21:10,739 - WARNING - [DEBUG-AUTORIZACIONES] Endpoint: procesadas | usuario=admin rol=admin (normalizado=admin)
+2026-01-15 15:25:11,144 - WARNING - [DEBUG-MIDDLEWARE] path=/health headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:25:11,166 - WARNING - [DEBUG-MIDDLEWARE] path=/catalog/productos headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:25:11,389 - WARNING - [DEBUG-MIDDLEWARE] path=/auth/me headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:25:11,597 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/pendientes headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:25:11,598 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/procesadas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:25:11,799 - WARNING - [DEBUG-AUTORIZACIONES] Endpoint: pendientes | usuario=admin rol=admin (normalizado=admin)
+2026-01-15 15:25:11,818 - WARNING - [DEBUG-AUTORIZACIONES] Endpoint: procesadas | usuario=admin rol=admin (normalizado=admin)
+2026-01-15 15:26:08,576 - WARNING - [DEBUG-MIDDLEWARE] path=/health headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:26:08,583 - WARNING - [DEBUG-MIDDLEWARE] path=/catalog/productos headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:26:08,805 - WARNING - [DEBUG-MIDDLEWARE] path=/auth/me headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:26:09,008 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/pendientes headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:26:09,009 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/procesadas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:26:09,207 - WARNING - [DEBUG-AUTORIZACIONES] Endpoint: pendientes | usuario=direccion1 rol=Direccion (normalizado=direccion)
+2026-01-15 15:26:09,209 - WARNING - [DEBUG-AUTORIZACIONES] Endpoint: procesadas | usuario=direccion1 rol=Direccion (normalizado=direccion)
+2026-01-15 15:27:22,327 - WARNING - [DEBUG-MIDDLEWARE] path=/health headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:27:22,348 - WARNING - [DEBUG-MIDDLEWARE] path=/catalog/productos headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:27:22,570 - WARNING - [DEBUG-MIDDLEWARE] path=/auth/me headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:27:22,782 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/mis-solicitudes headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:27:22,782 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/pendientes headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:27:22,783 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/procesadas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:27:22,986 - WARNING - [DEBUG-AUTORIZACIONES] Endpoint: pendientes | usuario=subdir1 rol=Subdireccion (normalizado=subdireccion)
+2026-01-15 15:27:22,990 - WARNING - [DEBUG-AUTORIZACIONES] Endpoint: procesadas | usuario=subdir1 rol=Subdireccion (normalizado=subdireccion)
+2026-01-15 15:27:23,009 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/mis-solicitudes headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 15:27:23,207 - WARNING - [DEBUG-AUTORIZACIONES] Endpoint: mis-solicitudes | usuario=subdir1 rol=Subdireccion (normalizado=subdireccion)
+2026-01-15 16:48:07,917 - WARNING - [DEBUG-MIDDLEWARE] path=/health headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 16:48:07,975 - WARNING - [DEBUG-MIDDLEWARE] path=/catalog/productos headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 16:48:07,980 - WARNING - [DEBUG-MIDDLEWARE] path=/catalog/productos headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 16:48:08,559 - WARNING - [DEBUG-MIDDLEWARE] path=/auth/me headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 16:48:08,571 - WARNING - [DEBUG-MIDDLEWARE] path=/auth/me headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 16:48:09,135 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/mis-solicitudes headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 16:48:09,142 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/pendientes headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 16:48:09,157 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/procesadas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 16:48:09,158 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/mis-solicitudes headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 16:48:09,455 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/pendientes headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 16:48:09,457 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/procesadas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 16:48:09,716 - WARNING - [DEBUG-AUTORIZACIONES] Endpoint: mis-solicitudes | usuario=subdir1 rol=Subdireccion (normalizado=subdireccion)
+2026-01-15 16:48:09,984 - WARNING - [DEBUG-AUTORIZACIONES] Endpoint: pendientes | usuario=subdir1 rol=Subdireccion (normalizado=subdireccion)
+2026-01-15 16:48:10,007 - WARNING - [DEBUG-AUTORIZACIONES] Endpoint: procesadas | usuario=subdir1 rol=Subdireccion (normalizado=subdireccion)
+2026-01-15 17:04:07,101 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:04:07,108 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:05:15,070 - WARNING - [DEBUG-MIDDLEWARE] path=/health headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:05:15,121 - WARNING - [DEBUG-MIDDLEWARE] path=/catalog/productos headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:05:15,125 - WARNING - [DEBUG-MIDDLEWARE] path=/catalog/productos headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:05:15,714 - WARNING - [DEBUG-MIDDLEWARE] path=/auth/me headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:05:15,733 - WARNING - [DEBUG-MIDDLEWARE] path=/auth/me headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:05:16,271 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/mis-solicitudes headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:05:16,276 - WARNING - [DEBUG-MIDDLEWARE] path=/autorizaciones/mis-solicitudes headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:05:16,815 - WARNING - [DEBUG-AUTORIZACIONES] Endpoint: mis-solicitudes | usuario=vendedor1 rol=Vendedor (normalizado=vendedor)
+2026-01-15 17:05:26,133 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:05:26,140 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:18:15,612 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:18:15,619 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:18:17,903 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:18:17,908 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:18:20,617 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:21:43,492 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:21:43,493 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:21:43,521 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:21:44,067 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:21:44,094 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:21:44,097 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:21:45,783 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:21:45,785 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:21:45,792 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:21:51,651 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:21:51,655 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}
+2026-01-15 17:21:51,956 - WARNING - [DEBUG-MIDDLEWARE] path=/pricing/listas headers={'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}

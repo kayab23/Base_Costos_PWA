@@ -51,8 +51,17 @@ function showToast(message, type = 'info', duration = 3500) {
     }, duration);
 }
 
+const getDefaultApiUrl = () => {
+    // Detecta si está corriendo en Docker (hostname no es localhost ni 127.0.0.1)
+    if (window.location.hostname === 'frontend' || window.location.hostname === '0.0.0.0') {
+        return 'http://backend:8000';
+    }
+    // Si está en localhost o cualquier otro entorno
+    return 'http://localhost:8000';
+};
+
 const state = {
-    baseUrl: localStorage.getItem('apiUrl') || 'http://localhost:8000',
+    baseUrl: localStorage.getItem('apiUrl') || getDefaultApiUrl(),
     auth: localStorage.getItem('authToken') || null,
     userRole: localStorage.getItem('userRole') || null, // Nuevo: almacenar rol
     productos: [], // Cache de productos para búsqueda rápida
