@@ -34,6 +34,7 @@
                     <input id="password" type="password" value="Admin123!" autocomplete="current-password">
                 </label>
                 <button id="connect-btn">Autenticar</button>
+                <button id="logout-btn" style="display:none; margin-left:10px;">Cerrar sesión</button>
                 <p id="status-msg" class="status">Sin conexión</p>
                 <p id="user-role" class="status" style="display:none; color: #00ff88; font-weight: 600;"></p>
             </div>
@@ -56,11 +57,11 @@
                 <div id="sku-inputs-container" class="sku-inputs">
                     <div class="sku-input-row">
                         <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
-                        <select class="transporte-select">
-                            <option value="">Ambos transportes</option>
-                            <option value="Maritimo">Marítimo</option>
-                            <option value="Aereo">Aéreo</option>
-                        </select>
+                        <div class="cantidad-stepper">
+                            <button type="button" class="stepper-btn stepper-minus">−</button>
+                            <input type="number" class="cantidad-input" placeholder="Cantidad" min="1" value="1" style="width:60px;">
+                            <button type="button" class="stepper-btn stepper-plus">+</button>
+                        </div>
                         <button class="icon-btn add-sku" title="Agregar otro SKU">+</button>
                     </div>
                 </div>
@@ -71,7 +72,7 @@
                     <thead id="table-header">
                         <tr>
                             <th>SKU</th>
-                            <th>Transporte</th>
+                            <th>Cantidad</th>
                             <th class="admin-gerencia">Costo Base MXN</th>
                             <th class="admin-gerencia">Flete %</th>
                             <th class="admin-gerencia">Seguro %</th>
@@ -81,7 +82,11 @@
                             <th class="admin-gerencia">Landed Cost</th>
                             <th class="admin-gerencia">Mark-up Base</th>
                             <th class="price-col">Precio Máximo</th>
+                            <th class="price-col">Monto Propuesto</th>
                             <th class="price-col">Precio Mínimo</th>
+                            <th class="price-col">Total Máximo</th>
+                            <th class="price-col">Total Negociado</th>
+                            <th class="price-col">Total Mínimo</th>
                         </tr>
                     </thead>
                     <tbody></tbody>

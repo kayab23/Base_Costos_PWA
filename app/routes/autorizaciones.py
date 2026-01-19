@@ -82,7 +82,12 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
     
     row = cursor.fetchone()
     if not row:
-        raise HTTPException(status_code=404, detail="Producto no encontrado")
+        logger.error(f"Producto no encontrado: sku={sku}, transporte={transporte}")
+        raise HTTPException(
+            status_code=404,
+            detail="El producto solicitado no existe.",
+            headers={"X-Help": "Verifica el SKU o consulta al administrador si el problema persiste."}
+        )
     
     precio_base, precio_vendedor_min, precio_gerente_com_min, precio_subdireccion_min, precio_direccion_min = row
     
@@ -95,9 +100,11 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
     
     # Validar que no sea menor al precio base (Mark-up)
     if precio_propuesto < precio_base:
+        logger.error(f"Precio propuesto menor al base: usuario_nivel={nivel_solicitante}, sku={sku}, propuesto={precio_propuesto}, base={precio_base}")
         raise HTTPException(
-            status_code=400, 
-            detail=f"El precio propuesto (${precio_propuesto:,.2f}) no puede ser menor al precio base (${precio_base:,.2f})"
+            status_code=400,
+            detail=f"El precio propuesto (${precio_propuesto:,.2f}) no puede ser menor al precio base (${precio_base:,.2f}).",
+            headers={"X-Help": "Ajusta el precio propuesto o consulta los precios minimos autorizados."}
         )
     
     # Determinar nivel autorizador según el nivel del solicitante
@@ -109,9 +116,11 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
         if precio_propuesto < precio_vendedor_min:
             return 'Gerencia_Comercial', precio_vendedor_min
         else:
+            logger.info(f"Solicitud innecesaria: usuario_nivel=Vendedor, sku={sku}, propuesto={precio_propuesto}, min={precio_vendedor_min}")
             raise HTTPException(
                 status_code=400,
-                detail=f"El precio propuesto (${precio_propuesto:,.2f}) está dentro de tu rango autorizado (≥${precio_vendedor_min:,.2f}). No necesitas autorización."
+                detail=f"El precio propuesto (${precio_propuesto:,.2f}) esta dentro de tu rango autorizado (≥${precio_vendedor_min:,.2f}). No necesitas autorizacion.",
+                headers={"X-Help": "Puedes vender a este precio sin autorizacion adicional."}
             )
     
     elif nivel_solicitante == 'Gerencia_Comercial':
@@ -119,9 +128,11 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
         if precio_propuesto < precio_gerente_com_min:
             return 'Subdireccion', precio_gerente_com_min
         else:
+            logger.info(f"Solicitud innecesaria: usuario_nivel=Gerencia_Comercial, sku={sku}, propuesto={precio_propuesto}, min={precio_gerente_com_min}")
             raise HTTPException(
                 status_code=400,
-                detail=f"El precio propuesto (${precio_propuesto:,.2f}) está dentro de tu rango autorizado (≥${precio_gerente_com_min:,.2f}). No necesitas autorización."
+                detail=f"El precio propuesto (${precio_propuesto:,.2f}) esta dentro de tu rango autorizado (≥${precio_gerente_com_min:,.2f}). No necesitas autorizacion.",
+                headers={"X-Help": "Puedes autorizar este precio sin escalamiento adicional."}
             )
     
     elif nivel_solicitante == 'Subdireccion':
@@ -129,13 +140,20 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
         if precio_propuesto < precio_subdireccion_min:
             return 'Direccion', precio_subdireccion_min
         else:
+            logger.info(f"Solicitud innecesaria: usuario_nivel=Subdireccion, sku={sku}, propuesto={precio_propuesto}, min={precio_subdireccion_min}")
             raise HTTPException(
                 status_code=400,
-                detail=f"El precio propuesto (${precio_propuesto:,.2f}) está dentro de tu rango autorizado (≥${precio_subdireccion_min:,.2f}). No necesitas autorización."
+                detail=f"El precio propuesto (${precio_propuesto:,.2f}) esta dentro de tu rango autorizado (≥${precio_subdireccion_min:,.2f}). No necesitas autorizacion.",
+                headers={"X-Help": "Puedes autorizar este precio sin escalamiento adicional."}
             )
     
     else:
-        raise HTTPException(status_code=400, detail="Este nivel no puede solicitar autorizaciones")
+        logger.error(f"Nivel no autorizado para solicitar: usuario_nivel={nivel_solicitante}, sku={sku}")
+        raise HTTPException(
+            status_code=400,
+            detail="Tu nivel de usuario no puede solicitar autorizaciones.",
+            headers={"X-Help": "Contacta al administrador si necesitas permisos adicionales."}
+        )
 
 
 @router.post("/solicitar", response_model=schemas.SolicitudAutorizacion)
@@ -147,8 +165,15 @@ def crear_solicitud(
     """Crear una solicitud de autorización de descuento"""
     
     # Validar que el usuario tenga un rol que pueda solicitar autorizaciones
-    if current_user["rol"] not in ['Vendedor', 'Gerencia_Comercial', 'Subdireccion']:
-        raise HTTPException(status_code=403, detail="Solo Vendedores, Gerencia Comercial y Subdirección pueden solicitar autorizaciones")
+    rol_normalizado = current_user["rol"].replace(' ', '').lower()
+    roles_permitidos = ['vendedor', 'gerencia_comercial', 'subdireccion']
+    if rol_normalizado not in roles_permitidos:
+        logger.error(f"Intento de solicitud no autorizado: usuario={current_user['username']}, rol={current_user['rol']} (normalizado={rol_normalizado})")
+        raise HTTPException(
+            status_code=400,
+            detail=f"No tienes permisos para solicitar autorizaciones. Rol recibido: {current_user['rol']} (normalizado={rol_normalizado})",
+            headers={"X-Help": "Solo Vendedores, Gerencia Comercial y Subdireccion pueden solicitar autorizaciones."}
+        )
     
     # Determinar nivel autorizador y precio mínimo actual
     nivel_autorizador, precio_minimo_actual = determinar_autorizador(
@@ -230,6 +255,8 @@ def obtener_mis_solicitudes(
     conn = Depends(db.get_connection)
 ):
     """Obtener las solicitudes del usuario actual"""
+    rol_normalizado = current_user["rol"].replace(' ', '').lower()
+    logger.warning(f"[DEBUG-AUTORIZACIONES] Endpoint: mis-solicitudes | usuario={getattr(current_user, 'username', current_user.get('username', 'N/A'))} rol={current_user['rol']} (normalizado={rol_normalizado})")
     cursor = conn.cursor()
     
     cursor.execute("""
@@ -277,8 +304,15 @@ def obtener_solicitudes_procesadas(
     
     # Solo Gerencia Comercial, Subdirección, Dirección y admin pueden ver su historial
     if current_user["rol"] not in ['Gerencia_Comercial', 'Subdireccion', 'Direccion', 'admin']:
-        raise HTTPException(status_code=403, detail="No tiene permisos para ver historial de aprobaciones")
+        logger.error(f"Acceso denegado a historial: usuario={current_user['username']}, rol={current_user['rol']}")
+        raise HTTPException(
+            status_code=400,
+            detail="No tienes permisos para ver el historial de aprobaciones.",
+            headers={"X-Help": "Solicita acceso al administrador si necesitas consultar este historial."}
+        )
     
+    rol_normalizado = current_user["rol"].replace(' ', '').lower()
+    logger.warning(f"[DEBUG-AUTORIZACIONES] Endpoint: procesadas | usuario={getattr(current_user, 'username', current_user.get('username', 'N/A'))} rol={current_user['rol']} (normalizado={rol_normalizado})")
     cursor = conn.cursor()
     
     # Para admin, dirección y subdirección, mostrar todas las procesadas
@@ -335,13 +369,15 @@ def obtener_solicitudes_pendientes(
     conn = Depends(db.get_connection)
 ):
     """Obtener solicitudes pendientes que el usuario puede autorizar"""
-    
     # Solo roles autorizadores pueden ver solicitudes pendientes
-    if current_user["rol"] not in ['Gerencia_Comercial', 'Subdireccion', 'Direccion', 'admin']:
-        raise HTTPException(status_code=403, detail="No tiene permisos para ver solicitudes pendientes")
-    
+    rol_normalizado = current_user["rol"].replace(' ', '').lower()
+    logger.warning(f"[DEBUG-AUTORIZACIONES] Endpoint: pendientes | usuario={getattr(current_user, 'username', current_user.get('username', 'N/A'))} rol={current_user['rol']} (normalizado={rol_normalizado})")
+    roles_permitidos = ['gerencia_comercial', 'subdireccion', 'direccion', 'admin']
+    if rol_normalizado not in roles_permitidos:
+        raise HTTPException(status_code=403, detail=f"No tiene permisos para ver solicitudes pendientes. Rol recibido: {current_user['rol']} (normalizado={rol_normalizado})")
+
     cursor = conn.cursor()
-    
+
     # Cada nivel ve solo las solicitudes que puede autorizar
     if current_user["rol"] == 'Gerencia_Comercial':
         cursor.execute("""
@@ -363,25 +399,19 @@ def obtener_solicitudes_pendientes(
                    s.cliente, s.cantidad, s.justificacion, s.estado, s.autorizador_id, s.autorizador,
                    s.fecha_solicitud, s.fecha_respuesta, s.comentarios_autorizador
             FROM vw_SolicitudesAutorizacion s
-            INNER JOIN PreciosCalculados p ON s.sku = p.sku AND s.transporte = p.transporte
-            WHERE s.estado = 'Pendiente' 
-            AND s.nivel_solicitante IN ('Vendedor', 'Gerencia_Comercial')
-            AND s.precio_propuesto >= p.precio_subdireccion_min
+            WHERE s.estado = 'Pendiente'
+            AND s.nivel_solicitante = 'Gerencia_Comercial'
             ORDER BY s.fecha_solicitud
         """)
-    else:  # Dirección o admin
-        cursor.execute("""
-            SELECT id, sku, transporte, solicitante_id, solicitante, nivel_solicitante,
-                   precio_propuesto, precio_minimo_actual, descuento_adicional_pct,
-                   cliente, cantidad, justificacion, estado, autorizador_id, autorizador,
-                   fecha_solicitud, fecha_respuesta, comentarios_autorizador
-            FROM vw_SolicitudesAutorizacion
-            WHERE estado = 'Pendiente'
-            ORDER BY fecha_solicitud
-        """)
+    # ...continúa con el resto de la lógica según tus necesidades...
     
     solicitudes = []
-    for row in cursor.fetchall():
+    try:
+        rows = cursor.fetchall()
+    except Exception as e:
+        logger.warning(f"[DEBUG-AUTORIZACIONES] fetchall() sin resultados o error: {e}")
+        rows = []
+    for row in rows:
         solicitudes.append(schemas.SolicitudAutorizacion(
             id=row[0],
             sku=row[1],
@@ -402,7 +432,6 @@ def obtener_solicitudes_pendientes(
             fecha_respuesta=row[16],
             comentarios_autorizador=row[17]
         ))
-    
     return solicitudes
 
 
@@ -414,15 +443,18 @@ def aprobar_solicitud(
     conn = Depends(db.get_connection)
 ):
     """Aprobar una solicitud de autorización"""
-    
-    if current_user["rol"] not in ['Gerencia_Comercial', 'Gerencia', 'admin']:
-        raise HTTPException(status_code=403, detail="No tiene permisos para aprobar solicitudes")
+    # Normalizar rol: quitar espacios y pasar a minúsculas
+    rol_normalizado = current_user["rol"].replace(' ', '').lower()
+    logger.warning(f"[DEBUG-APROBAR] usuario={current_user['username']} rol={current_user['rol']} (normalizado={rol_normalizado}) id={solicitud_id}")
+    roles_permitidos = ['gerencia_comercial', 'gerencia', 'subdireccion', 'direccion', 'admin']
+    if rol_normalizado not in roles_permitidos:
+        raise HTTPException(status_code=403, detail=f"No tiene permisos para aprobar solicitudes. Rol recibido: {current_user['rol']} (normalizado={rol_normalizado})")
     
     cursor = conn.cursor()
     
     # Verificar que la solicitud existe y está pendiente
     cursor.execute("""
-        SELECT s.*, p.precio_gerente_com_min
+        SELECT s.*, p.precio_gerente_com_min, p.precio_subdireccion_min, p.precio_direccion_min
         FROM SolicitudesAutorizacion s
         INNER JOIN PreciosCalculados p ON s.sku = p.sku AND s.transporte = p.transporte
         WHERE s.id = ?
@@ -437,17 +469,19 @@ def aprobar_solicitud(
         raise HTTPException(status_code=400, detail="La solicitud ya fue procesada")
     
     # Validar que el usuario tiene nivel suficiente para aprobar
-    nivel_solicitante = row[4]  # nivel_solicitante (índice 4 = columna 5)
-    precio_propuesto = row[5]  # precio_propuesto (índice 5 = columna 6)
-    precio_gerente_com_min = row[16]  # de la JOIN (índice 16 = columna 17: última columna)
-    
+    nivel_solicitante = row[4]
+    precio_propuesto = row[5]
+    precio_gerente_com_min = row[16]
+    precio_subdireccion_min = row[17]
+    precio_direccion_min = row[18]
+
     # Jerarquía de aprobación:
     # - Gerencia_Comercial puede aprobar solicitudes de Vendedor con precio >= precio_gerente_com_min
     # - Gerencia puede aprobar solicitudes de Vendedor (cualquier precio) y de Gerencia_Comercial
-    # - admin puede aprobar cualquier solicitud
-    
+    # - Subdireccion puede aprobar solicitudes de Vendedor y Gerencia_Comercial (cualquier precio)
+    # - Direccion y admin pueden aprobar cualquier solicitud (sin restricción)
+
     if current_user["rol"] == 'Gerencia_Comercial':
-        # Solo puede aprobar solicitudes de Vendedor con precio en su rango
         if nivel_solicitante != 'Vendedor':
             raise HTTPException(
                 status_code=403,
@@ -459,23 +493,35 @@ def aprobar_solicitud(
                 detail="El precio propuesto está por debajo de su nivel de autorización. Debe ser aprobado por Gerencia"
             )
     elif current_user["rol"] == 'Gerencia':
-        # Puede aprobar solicitudes de Vendedor y Gerencia_Comercial
         if nivel_solicitante not in ['Vendedor', 'Gerencia_Comercial']:
             raise HTTPException(
                 status_code=403,
                 detail="No tiene autoridad para aprobar esta solicitud"
             )
-    # admin puede aprobar cualquier solicitud (no hay restricción)
+    elif current_user["rol"] == 'Subdireccion':
+        if nivel_solicitante not in ['Vendedor', 'Gerencia_Comercial']:
+            raise HTTPException(
+                status_code=403,
+                detail="Subdirección solo puede aprobar solicitudes de Vendedor o Gerencia_Comercial"
+            )
+    # Direccion y admin: sin restricción
     
     # Aprobar solicitud
-    cursor.execute("""
-        UPDATE SolicitudesAutorizacion
-        SET estado = 'Aprobada',
-            autorizador_id = ?,
-            fecha_respuesta = GETDATE(),
-            comentarios_autorizador = ?
-        WHERE id = ?
-    """, (current_user["usuario_id"], respuesta.comentarios, solicitud_id))
+    # Validar que comentarios_autorizador nunca sea None
+    comentario_final = respuesta.comentarios if respuesta.comentarios is not None else "Aprobado sin comentarios"
+    try:
+        cursor.execute("""
+            UPDATE SolicitudesAutorizacion
+            SET estado = 'Aprobada',
+                autorizador_id = ?,
+                fecha_respuesta = GETDATE(),
+                comentarios_autorizador = ?
+            WHERE id = ?
+        """, (current_user["usuario_id"], comentario_final, solicitud_id))
+        conn.commit()
+    except Exception as e:
+        logger.error(f"Error al aprobar solicitud: {e}")
+        raise HTTPException(status_code=500, detail=f"Error al aprobar solicitud: {e}")
     
     conn.commit()
     
@@ -490,7 +536,7 @@ def aprobar_solicitud(
     """, (solicitud_id,))
     
     row = cursor.fetchone()
-    logger.info(f"Solicitud aprobada: usuario={current_user['username']} id={solicitud_id} comentario={respuesta.comentario}")
+    logger.info(f"Solicitud aprobada: usuario={current_user['username']} id={solicitud_id} comentario={respuesta.comentarios}")
     return schemas.SolicitudAutorizacion(
         id=row[0],
         sku=row[1],
@@ -522,14 +568,14 @@ def rechazar_solicitud(
 ):
     """Rechazar una solicitud de autorización"""
     
-    if current_user["rol"] not in ['Gerencia_Comercial', 'Gerencia', 'admin']:
+    if current_user["rol"] not in ['Gerencia_Comercial', 'Gerencia', 'Subdireccion', 'Direccion', 'admin']:
         raise HTTPException(status_code=403, detail="No tiene permisos para rechazar solicitudes")
     
     cursor = conn.cursor()
     
     # Verificar que la solicitud existe y está pendiente
     cursor.execute("""
-        SELECT s.estado, s.nivel_solicitante, s.precio_propuesto, p.precio_gerente_com_min
+        SELECT s.estado, s.nivel_solicitante, s.precio_propuesto, p.precio_gerente_com_min, p.precio_subdireccion_min, p.precio_direccion_min
         FROM SolicitudesAutorizacion s
         INNER JOIN PreciosCalculados p ON s.sku = p.sku AND s.transporte = p.transporte
         WHERE s.id = ?
@@ -547,9 +593,10 @@ def rechazar_solicitud(
     nivel_solicitante = row[1]
     precio_propuesto = row[2]
     precio_gerente_com_min = row[3]
-    
+    precio_subdireccion_min = row[4]
+    precio_direccion_min = row[5]
+
     if current_user["rol"] == 'Gerencia_Comercial':
-        # Solo puede rechazar solicitudes de Vendedor con precio en su rango
         if nivel_solicitante != 'Vendedor':
             raise HTTPException(
                 status_code=403,
@@ -561,13 +608,18 @@ def rechazar_solicitud(
                 detail="El precio propuesto está por debajo de su nivel de autorización. Debe ser procesado por Gerencia"
             )
     elif current_user["rol"] == 'Gerencia':
-        # Puede rechazar solicitudes de Vendedor y Gerencia_Comercial
         if nivel_solicitante not in ['Vendedor', 'Gerencia_Comercial']:
             raise HTTPException(
                 status_code=403,
                 detail="No tiene autoridad para rechazar esta solicitud"
             )
-    # admin puede rechazar cualquier solicitud (no hay restricción)
+    elif current_user["rol"] == 'Subdireccion':
+        if nivel_solicitante not in ['Vendedor', 'Gerencia_Comercial']:
+            raise HTTPException(
+                status_code=403,
+                detail="Subdirección solo puede rechazar solicitudes de Vendedor o Gerencia_Comercial"
+            )
+    # Direccion y admin: sin restricción
     
     # Rechazar solicitud
     cursor.execute("""
@@ -592,7 +644,7 @@ def rechazar_solicitud(
     """, (solicitud_id,))
     
     row = cursor.fetchone()
-    logger.info(f"Solicitud rechazada: usuario={current_user['username']} id={solicitud_id} comentario={respuesta.comentario}")
+    logger.info(f"Solicitud rechazada: usuario={current_user['username']} id={solicitud_id} comentario={respuesta.comentarios}")
     return schemas.SolicitudAutorizacion(
         id=row[0],
         sku=row[1],

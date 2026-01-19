@@ -1,5 +1,67 @@
+// --- Logout logic ---
+const logoutBtn = document.getElementById('logout-btn');
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', () => {
+        state.auth = null;
+        state.userRole = null;
+        localStorage.removeItem('authToken');
+        localStorage.removeItem('userRole');
+        selectors.status.textContent = 'Sesión cerrada correctamente.';
+        selectors.userRole.style.display = 'none';
+        selectors.connectBtn.style.display = '';
+        logoutBtn.style.display = 'none';
+        // Limpiar tablas y ocultar secciones sensibles
+        if (selectors.landedTable) selectors.landedTable.innerHTML = '';
+        if (selectors.productDetailsCard) selectors.productDetailsCard.style.display = 'none';
+        // Ocultar secciones de autorizaciones y precios
+        document.querySelectorAll('.card').forEach(card => {
+            if (!card.classList.contains('login-card')) {
+                card.style.display = 'none';
+            }
+        });
+        // Mostrar solo login
+        document.querySelector('.login-card').style.display = '';
+        showToast('Sesión cerrada.', 'success');
+    });
+}
+// --- Toast Notification System ---
+function showToast(message, type = 'info', duration = 3500) {
+    let toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.textContent = message;
+    Object.assign(toast.style, {
+        position: 'fixed',
+        bottom: '32px',
+        right: '32px',
+        background: type === 'error' ? '#d32f2f' : type === 'success' ? '#388e3c' : '#1976d2',
+        color: 'white',
+        padding: '14px 24px',
+        borderRadius: '6px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+        zIndex: 9999,
+        fontSize: '1rem',
+        opacity: 0.95,
+        transition: 'opacity 0.3s',
+        pointerEvents: 'none',
+    });
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = 0;
+        setTimeout(() => toast.remove(), 400);
+    }, duration);
+}
+
+const getDefaultApiUrl = () => {
+    // Detecta si está corriendo en Docker (hostname no es localhost ni 127.0.0.1)
+    if (window.location.hostname === 'frontend' || window.location.hostname === '0.0.0.0') {
+        return 'http://backend:8000';
+    }
+    // Si está en localhost o cualquier otro entorno
+    return 'http://localhost:8000';
+};
+
 const state = {
-    baseUrl: localStorage.getItem('apiUrl') || 'http://localhost:8000',
+    baseUrl: localStorage.getItem('apiUrl') || getDefaultApiUrl(),
     auth: localStorage.getItem('authToken') || null,
     userRole: localStorage.getItem('userRole') || null, // Nuevo: almacenar rol
     productos: [], // Cache de productos para búsqueda rápida
@@ -33,73 +95,111 @@ async function apiFetch(path, options = {}) {
         ...options,
         headers: {
             'Content-Type': 'application/json',
-            Authorization: `Basic ${state.auth}`,
+            Authorization: `Bearer ${state.auth}`,
             ...(options.headers || {}),
         },
     });
     if (!response.ok) {
-        const detail = await response.text();
-        throw new Error(`Error ${response.status}: ${detail}`);
+        let detail = '';
+        let help = '';
+        try {
+            const contentType = response.headers.get('content-type') || '';
+            if (contentType.includes('application/json')) {
+                const err = await response.json();
+                detail = err.detail || JSON.stringify(err);
+            } else {
+                detail = await response.text();
+            }
+            help = response.headers.get('x-help') || '';
+        } catch (e) {
+            detail = 'Error inesperado al procesar la respuesta del servidor.';
+        }
+        let msg = `Error ${response.status}: ${detail}`;
+        if (help) msg += `\nSugerencia: ${help}`;
+        showToast(msg, 'error');
+        throw new Error(msg);
     }
     return response.json();
 }
 
 selectors.connectBtn.addEventListener('click', async () => {
+    // Mostrar todas las secciones tras login
+    document.querySelectorAll('.card').forEach(card => {
+        card.style.display = '';
+    });
     console.log('Botón clickeado');
     try {
         selectors.status.textContent = 'Conectando...';
+        selectors.connectBtn.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = '';
         state.baseUrl = selectors.apiUrl.value.trim();
         const username = selectors.username.value.trim();
         const password = selectors.password.value;
-        
+
         console.log('URL:', state.baseUrl);
         console.log('Usuario:', username);
-        
+
+        // Health check antes de login
+        const healthResp = await fetch(`${state.baseUrl}/health`);
+        if (!healthResp.ok) {
+            throw new Error('No se pudo conectar al backend. Verifica la URL y que el backend esté corriendo.');
+        }
+
         if (!username || !password) {
             selectors.status.textContent = 'Ingrese usuario y contraseña';
+            selectors.connectBtn.style.display = '';
             return;
         }
-        
-        const token = btoa(`${username}:${password}`);
-        state.auth = token;
-        
-        // Primero probar la conexión
-        console.log('Probando conexión...');
-        const testResponse = await fetch(`${state.baseUrl}/health`);
-        console.log('Respuesta health:', testResponse.status);
-        
-        if (!testResponse.ok) {
-            throw new Error('No se puede conectar al servidor');
+
+        // Login JWT
+        const loginResponse = await fetch(`${state.baseUrl}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({ username, password })
+        });
+        if (!loginResponse.ok) {
+            const err = await loginResponse.json().catch(() => ({}));
+            throw new Error(err.detail || 'Credenciales inválidas');
         }
-        
-        // Luego intentar autenticar y obtener datos de usuario
-        console.log('Cargando productos...');
+        const { access_token } = await loginResponse.json();
+        state.auth = access_token;
+        localStorage.setItem('authToken', access_token);
+
+        // Obtener productos y rol
         await loadProductos();
-        
-        // Obtener información del usuario incluyendo rol
-        console.log('Obteniendo información del usuario...');
+        showToast('Productos cargados correctamente.', 'success');
         const userInfo = await apiFetch('/auth/me');
         state.userRole = userInfo.rol;
         localStorage.setItem('userRole', userInfo.rol);
-        
-        // Si todo salió bien, guardar credenciales
+
         localStorage.setItem('apiUrl', state.baseUrl);
-        localStorage.setItem('authToken', token);
-        
         selectors.status.textContent = `Conectado. ${state.productos.length} productos cargados.`;
         selectors.userRole.textContent = `Rol: ${state.userRole}`;
+        console.log('[LOGIN] Rol recibido:', state.userRole);
         selectors.userRole.style.display = 'block';
-        
-        // Actualizar interfaz según rol
+        console.log('[LOGIN] #user-role display:', selectors.userRole.style.display);
+        selectors.connectBtn.style.display = 'none';
+        if (logoutBtn) logoutBtn.style.display = '';
+
         updateUIForRole();
-        
+        showToast('Inicio de sesión exitoso.', 'success');
         console.log('Autenticación exitosa');
+        if (state.userRole === 'Vendedor') {
+            const aprobacionesSection = document.getElementById('procesadas-section');
+            if (aprobacionesSection) aprobacionesSection.style.display = 'none';
+        } else {
+            const aprobacionesSection = document.getElementById('procesadas-section');
+            if (aprobacionesSection) aprobacionesSection.style.display = '';
+        }
     } catch (error) {
         console.error('Error en autenticación:', error);
         selectors.status.textContent = `Error: ${error.message}`;
+        showToast(error.message, 'error');
         state.auth = null;
         localStorage.removeItem('authToken');
         localStorage.removeItem('userRole');
+        selectors.connectBtn.style.display = '';
+        if (logoutBtn) logoutBtn.style.display = 'none';
     }
 });
 
@@ -117,6 +217,7 @@ async function loadProductos() {
             .join('');
     } catch (error) {
         console.error('Error cargando productos:', error);
+        showToast(error.message, 'error');
     }
 }
 
@@ -126,46 +227,80 @@ async function loadLanded() {
         const skuQueries = Array.from(rows)
             .map(row => {
                 const sku = row.querySelector('.sku-input').value.trim();
-                const transporte = row.querySelector('.transporte-select').value.trim();
-                return { sku, transporte };
+                const cantidad = parseInt(row.querySelector('.cantidad-input')?.value) || 1;
+                return { sku, cantidad };
             })
             .filter(q => q.sku);
-        
+
         if (skuQueries.length === 0) {
-            selectors.landedTable.innerHTML = '<tr><td colspan="6">Ingrese al menos un SKU para consultar</td></tr>';
+            selectors.landedTable.innerHTML = '<tr><td colspan="8">Ingrese al menos un SKU para consultar</td></tr>';
             hideProductDetails();
             return;
         }
 
-        // Hacer consultas a /pricing/listas en lugar de /pricing/landed
+        // --- Mantener montos propuestos previos ---
+        const prevRows = state.rowsCotizacion || [];
+        // Consultar precios por SKU
         const promises = skuQueries.map(query => {
             const params = new URLSearchParams();
             params.append('sku', query.sku);
-            if (query.transporte) {
-                params.append('transporte', query.transporte);
-            }
             return apiFetch(`/pricing/listas?${params.toString()}`);
         });
 
         const results = await Promise.all(promises);
-        const allData = results.flat();
-        
-        // Guardar datos para descarga
+        // Emparejar cantidad con cada resultado
+        let allData = results.map((data, i) => {
+            const cantidad = skuQueries[i].cantidad;
+            return data.map(row => ({ ...row, cantidad }));
+        }).flat();
+
+        // --- Restaurar montos propuestos previos por SKU ---
+        allData = allData.map(row => {
+            const prev = prevRows.find(r => r.sku === row.sku);
+            if (prev && prev.monto_propuesto !== undefined) {
+                return { ...row, monto_propuesto: prev.monto_propuesto };
+            }
+            return row;
+        });
+
         state.landedData = allData;
-        
+
         if (allData.length === 0) {
-            selectors.landedTable.innerHTML = '<tr><td colspan="6">No se encontraron resultados</td></tr>';
+            selectors.landedTable.innerHTML = '<tr><td colspan="8">No se encontraron resultados</td></tr>';
             hideProductDetails();
             return;
         }
 
-        // Renderizar según rol
-        selectors.landedTable.innerHTML = allData
+        // Agrupar por SKU y categoría, y mostrar solo el registro con menor precio mínimo
+        const agrupados = {};
+        allData.forEach(row => {
+            const key = row.sku + '|' + (row.categoria || '');
+            if (!agrupados[key] || (row.precio_vendedor_min < agrupados[key].precio_vendedor_min)) {
+                agrupados[key] = row;
+            }
+        });
+        const rowsToShow = Object.values(agrupados);
+        selectors.landedTable.innerHTML = rowsToShow
             .slice(0, 100)
             .map(row => renderPriceRow(row))
             .join('');
-        
-        // Mostrar detalles de los productos consultados
+        // Forzar que los inputs de monto propuesto sean editables y no tengan valor fijo
+        setTimeout(() => {
+            document.querySelectorAll('.monto-propuesto-input').forEach(input => {
+                input.removeAttribute('readonly');
+                input.removeAttribute('disabled');
+                input.type = 'text';
+                input.value = input.value;
+                input.style.background = '';
+                input.style.pointerEvents = 'auto';
+                input.style.userSelect = 'auto';
+                input.tabIndex = 0;
+                input.onfocus = function() { this.select(); };
+            });
+        }, 0);
+        // Guardar para cotización
+        state.rowsCotizacion = rowsToShow;
+
         const uniqueSkus = [...new Set(skuQueries.map(q => q.sku))];
         if (uniqueSkus.length > 0) {
             showProductDetails(uniqueSkus);
@@ -174,6 +309,7 @@ async function loadLanded() {
         }
     } catch (error) {
         selectors.status.textContent = error.message;
+        showToast(error.message, 'error');
     }
 }
 
@@ -231,14 +367,31 @@ function addSkuInput() {
     newRow.className = 'sku-input-row';
     newRow.innerHTML = `
         <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
-        <select class="transporte-select">
-            <option value="">Ambos transportes</option>
-            <option value="Maritimo">Marítimo</option>
-            <option value="Aereo">Aéreo</option>
-        </select>
+        <div class="cantidad-stepper">
+            <button type="button" class="stepper-btn stepper-minus">−</button>
+            <input type="number" class="cantidad-input" min="1" value="1" style="width:60px" placeholder="Cantidad">
+            <button type="button" class="stepper-btn stepper-plus">+</button>
+        </div>
         <button class="icon-btn remove" title="Quitar SKU">×</button>
     `;
     selectors.skuInputsContainer.appendChild(newRow);
+    attachStepperEvents(newRow);
+}
+
+function attachStepperEvents(row) {
+    const minusBtn = row.querySelector('.stepper-minus');
+    const plusBtn = row.querySelector('.stepper-plus');
+    const input = row.querySelector('.cantidad-input');
+    minusBtn.addEventListener('click', () => {
+        let val = parseInt(input.value) || 1;
+        if (val > 1) input.value = val - 1;
+        input.dispatchEvent(new Event('input'));
+    });
+    plusBtn.addEventListener('click', () => {
+        let val = parseInt(input.value) || 1;
+        input.value = val + 1;
+        input.dispatchEvent(new Event('input'));
+    });
 }
 
 function removeSkuInput(button) {
@@ -253,22 +406,25 @@ function clearAllSkus() {
     selectors.skuInputsContainer.innerHTML = `
         <div class="sku-input-row">
             <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
-            <select class="transporte-select">
-                <option value="">Ambos transportes</option>
-                <option value="Maritimo">Marítimo</option>
-                <option value="Aereo">Aéreo</option>
-            </select>
+            <div class="cantidad-stepper">
+                <button type="button" class="stepper-btn stepper-minus">−</button>
+                <input type="number" class="cantidad-input" min="1" value="1" style="width:60px" placeholder="Cantidad">
+                <button type="button" class="stepper-btn stepper-plus">+</button>
+            </div>
             <button class="icon-btn add-sku" title="Agregar otro SKU">+</button>
         </div>
     `;
+    // Adjuntar eventos a los steppers
+    document.querySelectorAll('.sku-input-row').forEach(attachStepperEvents);
     selectors.landedTable.innerHTML = '';
     hideProductDetails();
 }
 
 function formatCurrency(value) {
-    return (value ?? 0).toLocaleString('es-MX', { 
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
+    // Redondear a entero
+    return Math.round(value ?? 0).toLocaleString('es-MX', {
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0
     });
 }
 
@@ -290,77 +446,78 @@ function updateUIForRole() {
     }
     
     // Configurar UI según rol
+    const downloadBtn = document.getElementById('download-excel');
+    const sectionTitle = document.getElementById('section-title');
+    const sectionDesc = document.getElementById('section-description');
+    const solicitarAutSection = document.getElementById('solicitar-autorizacion-section');
+    const misSolicitudesSection = document.getElementById('mis-solicitudes-section');
+    const pendientesSection = document.getElementById('pendientes-section');
+    const procesadasSection = document.getElementById('procesadas-section');
+
     if (role === 'Vendedor') {
-        document.getElementById('section-title').textContent = 'Mi Lista de Precios';
-        document.getElementById('section-description').textContent = 'Precios autorizados: 20% descuento desde Precio Máximo';
-        
+        if (sectionTitle) sectionTitle.textContent = 'Mi Lista de Precios';
+        if (sectionDesc) sectionDesc.textContent = 'Precios autorizados: 20% descuento desde Precio Máximo';
+        // Ocultar y deshabilitar botón de descarga Excel
+        if (downloadBtn) {
+            downloadBtn.style.display = 'none';
+            downloadBtn.disabled = true;
+        }
         // Mostrar sección de solicitud de autorización
-        document.getElementById('solicitar-autorizacion-section').style.display = 'block';
-        document.getElementById('mis-solicitudes-section').style.display = 'block';
-        document.getElementById('pendientes-section').style.display = 'none';
-        
+        if (solicitarAutSection) solicitarAutSection.style.display = 'block';
+        if (misSolicitudesSection) misSolicitudesSection.style.display = 'block';
+        if (pendientesSection) pendientesSection.style.display = 'none';
         loadMisSolicitudes();
     } else if (role === 'Gerencia_Comercial') {
-        document.getElementById('section-title').textContent = 'Lista de Precios Gerencia Comercial';
-        document.getElementById('section-description').textContent = 'Costos completos y precios autorizados (25% descuento desde Precio Máximo)';
-        
-        // Mostrar solicitud de autorización y pendientes
-        document.getElementById('solicitar-autorizacion-section').style.display = 'block';
-        document.getElementById('mis-solicitudes-section').style.display = 'block';
-        document.getElementById('pendientes-section').style.display = 'block';
-        document.getElementById('procesadas-section').style.display = 'block';
-        
+        // Mostrar botón para otros roles
+        if (downloadBtn) {
+            downloadBtn.style.display = '';
+            downloadBtn.disabled = false;
+        }
+        if (sectionTitle) sectionTitle.textContent = 'Lista de Precios Gerencia Comercial';
+        if (sectionDesc) sectionDesc.textContent = 'Costos completos y precios autorizados (25% descuento desde Precio Máximo)';
+        if (solicitarAutSection) solicitarAutSection.style.display = 'block';
+        if (misSolicitudesSection) misSolicitudesSection.style.display = 'block';
+        if (pendientesSection) pendientesSection.style.display = 'block';
+        if (procesadasSection) procesadasSection.style.display = 'block';
         loadMisSolicitudes();
         loadPendientes();
         loadProcesadas();
     } else if (role === 'Subdireccion') {
-        document.getElementById('section-title').textContent = 'Lista de Precios Subdirección';
-        document.getElementById('section-description').textContent = 'Costos completos y precios autorizados (30% descuento)';
-        
-        // Puede solicitar y ver pendientes
-        document.getElementById('solicitar-autorizacion-section').style.display = 'block';
-        document.getElementById('mis-solicitudes-section').style.display = 'block';
-        document.getElementById('pendientes-section').style.display = 'block';
-        document.getElementById('procesadas-section').style.display = 'block';
-        
+        if (sectionTitle) sectionTitle.textContent = 'Lista de Precios Subdirección';
+        if (sectionDesc) sectionDesc.textContent = 'Costos completos y precios autorizados (30% descuento)';
+        if (solicitarAutSection) solicitarAutSection.style.display = 'block';
+        if (misSolicitudesSection) misSolicitudesSection.style.display = 'block';
+        if (pendientesSection) pendientesSection.style.display = 'block';
+        if (procesadasSection) procesadasSection.style.display = 'block';
         loadMisSolicitudes();
         loadPendientes();
         loadProcesadas();
     } else if (role === 'Direccion') {
-        document.getElementById('section-title').textContent = 'Lista de Precios Dirección';
-        document.getElementById('section-description').textContent = 'Costos completos y precios autorizados (35% descuento)';
-        
-        // Solo ver pendientes, no puede solicitar
-        document.getElementById('solicitar-autorizacion-section').style.display = 'none';
-        document.getElementById('mis-solicitudes-section').style.display = 'none';
-        document.getElementById('pendientes-section').style.display = 'block';
-        document.getElementById('procesadas-section').style.display = 'block';
-        
+        if (sectionTitle) sectionTitle.textContent = 'Lista de Precios Dirección';
+        if (sectionDesc) sectionDesc.textContent = 'Costos completos y precios autorizados (35% descuento)';
+        if (solicitarAutSection) solicitarAutSection.style.display = 'none';
+        if (misSolicitudesSection) misSolicitudesSection.style.display = 'none';
+        if (pendientesSection) pendientesSection.style.display = 'block';
+        if (procesadasSection) procesadasSection.style.display = 'block';
         loadPendientes();
         loadProcesadas();
     } else if (role === 'Gerencia') {
-        document.getElementById('section-title').textContent = 'Lista de Precios Gerencia';
-        document.getElementById('section-description').textContent = 'Costos completos y vista de todas las autorizaciones';
-        
-        // Solo ver pendientes, no puede solicitar
-        document.getElementById('solicitar-autorizacion-section').style.display = 'none';
-        document.getElementById('mis-solicitudes-section').style.display = 'none';
-        document.getElementById('pendientes-section').style.display = 'block';
-        document.getElementById('procesadas-section').style.display = 'block';
-        
+        if (sectionTitle) sectionTitle.textContent = 'Lista de Precios Gerencia';
+        if (sectionDesc) sectionDesc.textContent = 'Costos completos y vista de todas las autorizaciones';
+        if (solicitarAutSection) solicitarAutSection.style.display = 'none';
+        if (misSolicitudesSection) misSolicitudesSection.style.display = 'none';
+        if (pendientesSection) pendientesSection.style.display = 'block';
+        if (procesadasSection) procesadasSection.style.display = 'block';
         loadPendientes();
         loadProcesadas();
     } else {
         // Admin puede ver todo
-        document.getElementById('section-title').textContent = 'Lista de Precios - Vista Administrativa';
-        document.getElementById('section-description').textContent = 'Todas las listas de precios y costos completos';
-        
-        // Admin puede ver pendientes
-        document.getElementById('solicitar-autorizacion-section').style.display = 'none';
-        document.getElementById('mis-solicitudes-section').style.display = 'none';
-        document.getElementById('pendientes-section').style.display = 'block';
-        document.getElementById('procesadas-section').style.display = 'block';
-        
+        if (sectionTitle) sectionTitle.textContent = 'Lista de Precios - Vista Administrativa';
+        if (sectionDesc) sectionDesc.textContent = 'Todas las listas de precios y costos completos';
+        if (solicitarAutSection) solicitarAutSection.style.display = 'none';
+        if (misSolicitudesSection) misSolicitudesSection.style.display = 'none';
+        if (pendientesSection) pendientesSection.style.display = 'block';
+        if (procesadasSection) procesadasSection.style.display = 'block';
         loadPendientes();
         loadProcesadas();
     }
@@ -369,9 +526,7 @@ function updateUIForRole() {
 // Nueva función: Renderizar fila según rol
 function renderPriceRow(row) {
     const role = state.userRole || 'Vendedor';
-    
     let precioMax, precioMin;
-    
     if (role === 'Vendedor') {
         precioMax = row.precio_maximo;
         precioMin = row.precio_vendedor_min;
@@ -385,17 +540,16 @@ function renderPriceRow(row) {
         precioMax = row.precio_maximo;
         precioMin = row.precio_direccion_min;
     } else {
-        // Admin ve precio máximo y mínimo absoluto
         precioMax = row.precio_maximo;
         precioMin = row.precio_direccion_min;
     }
-    
+    const montoPropuestoId = `monto-propuesto-${row.sku}`;
+    // Usar el monto propuesto previo si existe
+    let montoPropuesto = row.monto_propuesto !== undefined ? row.monto_propuesto : '';
     let html = `
         <tr>
             <td>${row.sku}</td>
-            <td>${row.transporte}</td>`;
-    
-    // Mostrar costos completos para roles administrativos (todos excepto Vendedor)
+            <td>${row.cantidad}</td>`;
     if (role !== 'Vendedor') {
         html += `
             <td class="admin-gerencia">${formatCurrency(row.costo_base_mxn)}</td>
@@ -407,14 +561,82 @@ function renderPriceRow(row) {
             <td class="admin-gerencia">${formatCurrency(row.landed_cost_mxn)}</td>
             <td class="admin-gerencia">${formatCurrency(row.precio_base_mxn)}</td>`;
     }
-    
+    // En renderPriceRow, si no hay monto propuesto, dejar Total Negociado vacío
+    let totalNegociado = '';
+    if (montoPropuesto && !isNaN(parseFloat(montoPropuesto))) {
+        totalNegociado = formatCurrency(parseFloat(montoPropuesto) * row.cantidad);
+    }
     html += `
             <td class="price-col">${formatCurrency(precioMax)}</td>
+            <td class="price-col">
+                <input type="text" class="monto-propuesto-input" id="${montoPropuestoId}" value="${montoPropuesto}" style="width:100px;" autocomplete="off" placeholder="Escribe monto">
+            </td>
             <td class="price-col">${formatCurrency(precioMin)}</td>
+            <td class="price-col">${formatCurrency(precioMax * row.cantidad)}</td>
+            <td class="price-col" id="total-negociado-${row.sku}">${totalNegociado}</td>
+            <td class="price-col">${formatCurrency(precioMin * row.cantidad)}</td>
         </tr>`;
-    
     return html;
 }
+
+// Escuchar cambios en monto propuesto y actualizar total negociado
+document.addEventListener('input', function(e) {
+    if (e.target.classList.contains('monto-propuesto-input')) {
+        const input = e.target;
+        const sku = input.id.replace('monto-propuesto-', '');
+        const row = (state.rowsCotizacion || []).find(r => r.sku === sku);
+        if (!row) return;
+        let monto = input.value.replace(',', '.');
+        row.monto_propuesto = monto; // Guardar el monto digitado
+        // Actualizar total negociado en tiempo real
+        const cantidad = Math.round(row.cantidad);
+        let montoNum = parseFloat(monto);
+        if (isNaN(montoNum)) montoNum = 0;
+        const total = montoNum * cantidad;
+        const totalCell = document.getElementById(`total-negociado-${sku}`);
+        if (totalCell) totalCell.textContent = formatCurrency(total);
+    }
+    // Actualizar Total Negociado si cambia la cantidad
+    if (e.target.classList.contains('cantidad-input')) {
+        const rowDiv = e.target.closest('.sku-input-row');
+        const skuInput = rowDiv.querySelector('.sku-input');
+        const sku = skuInput.value.trim();
+        const row = (state.rowsCotizacion || []).find(r => r.sku === sku);
+        if (!row) return;
+        let cantidad = Math.round(parseFloat(e.target.value) || 1);
+        row.cantidad = cantidad;
+        // Obtener el monto propuesto actual
+        const montoInput = document.getElementById(`monto-propuesto-${sku}`);
+        let monto = montoInput ? parseFloat(montoInput.value.replace(',', '.')) : 0;
+        if (isNaN(monto)) monto = 0;
+        if (montoInput) montoInput.value = monto;
+        // Actualizar total negociado
+        const total = Math.round(monto) * cantidad;
+        const totalCell = document.getElementById(`total-negociado-${sku}`);
+        if (totalCell) totalCell.textContent = formatCurrency(total);
+    }
+});
+
+// Validar monto propuesto solo al perder el foco
+selectors.landedTable.addEventListener('blur', function(e) {
+    if (e.target.classList.contains('monto-propuesto-input')) {
+        const input = e.target;
+        const sku = input.id.replace('monto-propuesto-', '');
+        const row = (state.rowsCotizacion || []).find(r => r.sku === sku);
+        if (!row) return;
+        let monto = parseFloat(input.value.replace(',', '.'));
+        if (isNaN(monto)) monto = row.precio_maximo;
+        if (monto < row.precio_vendedor_min) monto = row.precio_vendedor_min;
+        if (monto > row.precio_maximo) monto = row.precio_maximo;
+        monto = Math.round(monto);
+        input.value = monto;
+        // Actualizar total negociado
+        const cantidad = Math.round(row.cantidad);
+        const total = monto * cantidad;
+        const totalCell = document.getElementById(`total-negociado-${sku}`);
+        if (totalCell) totalCell.textContent = formatCurrency(total);
+    }
+}, true);
 
 function downloadExcel() {
     if (state.landedData.length === 0) {
@@ -548,6 +770,10 @@ selectors.skuInputsContainer.addEventListener('click', (e) => {
     } else if (e.target.classList.contains('remove')) {
         removeSkuInput(e.target);
     }
+});
+// Adjuntar eventos a los steppers al cargar la página
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.sku-input-row').forEach(attachStepperEvents);
 });
 
 // Debounce en inputs de SKU
@@ -722,13 +948,12 @@ async function loadProcesadas() {
 async function aprobarSolicitud(id) {
     const comentarios = prompt('Comentarios (opcional):');
     if (comentarios === null) return; // Usuario canceló
-    
     try {
+        console.log('AprobarSolicitud: method=PUT, Authorization:', state.auth);
         await apiFetch(`/autorizaciones/${id}/aprobar`, {
             method: 'PUT',
             body: JSON.stringify({ comentarios })
         });
-        
         alert('✅ Solicitud aprobada');
         loadPendientes();
         loadProcesadas();
@@ -741,13 +966,12 @@ async function aprobarSolicitud(id) {
 async function rechazarSolicitud(id) {
     const comentarios = prompt('Motivo del rechazo (opcional):');
     if (comentarios === null) return; // Usuario canceló
-    
     try {
+        console.log('RechazarSolicitud: method=PUT, Authorization:', state.auth);
         await apiFetch(`/autorizaciones/${id}/rechazar`, {
             method: 'PUT',
             body: JSON.stringify({ comentarios })
         });
-        
         alert('❌ Solicitud rechazada');
         loadPendientes();
         loadProcesadas();

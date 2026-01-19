@@ -1,0 +1,41 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "FastAPI Backend Metrics",
+    "tags": ["fastapi", "prometheus"],
+    "timezone": "browser",
+    "schemaVersion": 30,
+    "version": 1,
+    "refresh": "10s",
+    "panels": [
+      {
+        "type": "stat",
+        "title": "Total Requests",
+        "datasource": "Prometheus",
+        "targets": [
+          { "expr": "requests_total" }
+        ],
+        "gridPos": { "x": 0, "y": 0, "w": 8, "h": 4 }
+      },
+      {
+        "type": "stat",
+        "title": "Total Errors",
+        "datasource": "Prometheus",
+        "targets": [
+          { "expr": "errors_total" }
+        ],
+        "gridPos": { "x": 8, "y": 0, "w": 8, "h": 4 }
+      },
+      {
+        "type": "stat",
+        "title": "Uptime (seconds)",
+        "datasource": "Prometheus",
+        "targets": [
+          { "expr": "uptime_seconds" }
+        ],
+        "gridPos": { "x": 16, "y": 0, "w": 8, "h": 4 }
+      }
+    ]
+  },
+  "overwrite": false
+}

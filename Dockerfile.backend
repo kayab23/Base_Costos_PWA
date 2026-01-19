@@ -2,6 +2,14 @@
 FROM python:3.11-slim
 WORKDIR /app
 COPY requirements.txt ./
+# Instalar dependencias del sistema para pyodbc
+RUN apt-get update \
+	&& apt-get install -y curl apt-transport-https gnupg2 unixodbc unixodbc-dev gcc g++ \
+	&& curl -sSL https://packages.microsoft.com/keys/microsoft.asc -o /etc/apt/trusted.gpg.d/microsoft.asc \
+	&& curl -sSL https://packages.microsoft.com/config/debian/$(. /etc/os-release && echo $VERSION_CODENAME)/prod.list -o /etc/apt/sources.list.d/mssql-release.list \
+	&& apt-get update \
+	&& ACCEPT_EULA=Y apt-get install -y msodbcsql18 \
+	&& rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir -r requirements.txt
 COPY ./app ./app
 COPY ./cost_engine.py ./cost_engine.py

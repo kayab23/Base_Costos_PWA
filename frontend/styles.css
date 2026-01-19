@@ -1,3 +1,33 @@
+/* Stepper para cantidad */
+.cantidad-stepper {
+    display: flex;
+    align-items: center;
+    gap: 0.2rem;
+}
+.stepper-btn {
+    background: var(--surface-strong);
+    border: none;
+    color: var(--accent-strong);
+    font-size: 1.3rem;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+.stepper-btn:hover {
+    background: var(--accent-strong);
+    color: #fff;
+}
+.cantidad-input {
+    text-align: center;
+    font-size: 1.1rem;
+    width: 60px;
+    margin: 0 0.2rem;
+}
 :root {
     --bg: #0a0a0f;
     --surface: rgba(255, 255, 255, 0.08);
@@ -408,6 +438,26 @@ button.primary:hover {
 
 .btn-rechazar:hover {
     background: #da190b;
+}
+
+/* Ocultar flechas de los inputs tipo number en todos los navegadores */
+.cantidad-input::-webkit-outer-spin-button,
+.cantidad-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.cantidad-input {
+    -moz-appearance: textfield;
+}
+
+/* Ocultar flechas de los inputs tipo number en todos los navegadores para Monto Propuesto */
+.monto-propuesto-input::-webkit-outer-spin-button,
+.monto-propuesto-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+.monto-propuesto-input {
+    -moz-appearance: textfield;
 }
 
 @media (max-width: 640px) {
