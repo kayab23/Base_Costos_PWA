@@ -42,35 +42,37 @@
 
         <section class="card">
             <header>
-                <div>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
                     <h3 id="section-title">Listas de Precios</h3>
                     <p id="section-description">Consulta precios según tu nivel de autorización.</p>
-                </div>
-                <div class="form-group" style="margin-bottom: 12px;">
-                    <label>Cliente
-                        <input type="text" id="input-cliente" placeholder="Nombre del cliente">
-                    </label>
-                </div>
-                <div class="controls-header">
-                    <h4>SKUs a cotizar:</h4>
-                    <div class="button-group">
-                        <button class="ghost" data-action="load-landed">Consultar</button>
-                        <button class="ghost" id="download-excel">📥 Descargar Excel</button>
-                        <button class="ghost" id="clear-skus">Limpiar</button>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label>Cliente
+                            <input type="text" id="input-cliente" placeholder="Nombre del cliente">
+                        </label>
                     </div>
-                </div>
-                <div id="sku-inputs-container" class="sku-inputs">
-                    <div class="sku-input-row">
-                        <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
-                        <div class="cantidad-stepper">
-                            <button type="button" class="stepper-btn stepper-minus">−</button>
-                            <input type="number" class="cantidad-input" placeholder="Cantidad" min="1" value="1" style="width:60px;">
-                            <button type="button" class="stepper-btn stepper-plus">+</button>
+                    <div style="display: flex; align-items: flex-end; gap: 1.5rem; flex-wrap: wrap;">
+                        <div>
+                            <h4 style="margin-bottom: 0.5rem;">SKUs a cotizar:</h4>
+                            <div id="sku-inputs-container" class="sku-inputs">
+                                <div class="sku-input-row">
+                                    <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
+                                    <div class="cantidad-stepper">
+                                        <button type="button" class="stepper-btn stepper-minus">−</button>
+                                        <input type="number" class="cantidad-input" placeholder="Cantidad" min="1" value="1" style="width:60px;">
+                                        <button type="button" class="stepper-btn stepper-plus">+</button>
+                                    </div>
+                                    <button class="icon-btn add-sku" title="Agregar otro SKU">+</button>
+                                </div>
+                            </div>
+                            <datalist id="sku-list"></datalist>
                         </div>
-                        <button class="icon-btn add-sku" title="Agregar otro SKU">+</button>
+                        <div class="button-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <button class="ghost" data-action="load-landed">Consultar</button>
+                            <button class="ghost" id="clear-skus">Limpiar</button>
+                            <button class="primary pdf-cotizar-btn" id="pdf-cotizar-btn-global" style="font-weight:600;">📄 PDF Cotización</button>
+                        </div>
                     </div>
                 </div>
-                <datalist id="sku-list"></datalist>
             </header>
             <div class="table-wrapper">
                 <table id="landed-table">
