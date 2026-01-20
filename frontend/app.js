@@ -1,4 +1,3 @@
-// --- Logout logic ---
 const logoutBtn = document.getElementById('logout-btn');
 if (logoutBtn) {
     logoutBtn.addEventListener('click', () => {
@@ -203,10 +202,12 @@ selectors.connectBtn.addEventListener('click', async () => {
     }
 });
 
+// --- DEBUG: Mostrar catálogo completo en consola al cargar productos ---
 async function loadProductos() {
     try {
         const data = await apiFetch('/catalog/productos');
         state.productos = data;
+        console.log('[DEBUG] Catálogo productos:', data); // <-- Línea de depuración
         // Poblar datalist para autocompletado
         selectors.skuList.innerHTML = data
             .map((p) => {
@@ -220,6 +221,7 @@ async function loadProductos() {
         showToast(error.message, 'error');
     }
 }
+// --- FIN DEBUG ---
 
 async function loadLanded() {
     try {
@@ -382,16 +384,31 @@ function attachStepperEvents(row) {
     const minusBtn = row.querySelector('.stepper-minus');
     const plusBtn = row.querySelector('.stepper-plus');
     const input = row.querySelector('.cantidad-input');
-    minusBtn.addEventListener('click', () => {
-        let val = parseInt(input.value) || 1;
-        if (val > 1) input.value = val - 1;
-        input.dispatchEvent(new Event('input'));
-    });
-    plusBtn.addEventListener('click', () => {
-        let val = parseInt(input.value) || 1;
-        input.value = val + 1;
-        input.dispatchEvent(new Event('input'));
-    });
+    // Forzar habilitación
+    if (input) {
+        input.removeAttribute('readonly');
+        input.removeAttribute('disabled');
+        input.style.pointerEvents = 'auto';
+        input.style.userSelect = 'auto';
+    }
+    if (minusBtn) {
+        minusBtn.disabled = false;
+        minusBtn.style.pointerEvents = 'auto';
+        minusBtn.addEventListener('click', () => {
+            let val = parseInt(input.value) || 1;
+            if (val > 1) input.value = val - 1;
+            input.dispatchEvent(new Event('input'));
+        });
+    }
+    if (plusBtn) {
+        plusBtn.disabled = false;
+        plusBtn.style.pointerEvents = 'auto';
+        plusBtn.addEventListener('click', () => {
+            let val = parseInt(input.value) || 1;
+            input.value = val + 1;
+            input.dispatchEvent(new Event('input'));
+        });
+    }
 }
 
 function removeSkuInput(button) {
@@ -415,7 +432,10 @@ function clearAllSkus() {
         </div>
     `;
     // Adjuntar eventos a los steppers
-    document.querySelectorAll('.sku-input-row').forEach(attachStepperEvents);
+    // Adjuntar eventos a los steppers solo si no existen
+    document.querySelectorAll('.sku-input-row').forEach(row => {
+        attachStepperEvents(row);
+    });
     selectors.landedTable.innerHTML = '';
     hideProductDetails();
 }
@@ -567,17 +587,89 @@ function renderPriceRow(row) {
         totalNegociado = formatCurrency(parseFloat(montoPropuesto) * row.cantidad);
     }
     html += `
-            <td class="price-col">${formatCurrency(precioMax)}</td>
-            <td class="price-col">
-                <input type="text" class="monto-propuesto-input" id="${montoPropuestoId}" value="${montoPropuesto}" style="width:100px;" autocomplete="off" placeholder="Escribe monto">
-            </td>
-            <td class="price-col">${formatCurrency(precioMin)}</td>
-            <td class="price-col">${formatCurrency(precioMax * row.cantidad)}</td>
-            <td class="price-col" id="total-negociado-${row.sku}">${totalNegociado}</td>
-            <td class="price-col">${formatCurrency(precioMin * row.cantidad)}</td>
-        </tr>`;
+        <td class="price-col">${formatCurrency(precioMax)}</td>
+        <td class="price-col">
+            <input type="text" class="monto-propuesto-input" id="${montoPropuestoId}" value="${montoPropuesto}" style="width:100px;" autocomplete="off" placeholder="Escribe monto">
+        </td>
+        <td class="price-col">${formatCurrency(precioMin)}</td>
+        <td class="price-col">${formatCurrency(precioMax * row.cantidad)}</td>
+        <td class="price-col" id="total-negociado-${row.sku}">${totalNegociado}</td>
+        <td class="price-col">${formatCurrency(precioMin * row.cantidad)}</td>
+        <td class="price-col">
+            <button class="pdf-cotizar-btn" data-sku="${row.sku}">PDF Cotización</button>
+        </td>
+    </tr>`;
     return html;
 }
+
+
+// Evento para generar y descargar PDF de cotización (multi-SKU)
+document.addEventListener('click', async function(e) {
+    if (e.target.classList.contains('pdf-cotizar-btn')) {
+        // Leer el valor del campo cliente
+        state.cliente = document.getElementById('input-cliente')?.value || '';
+
+        // Tomar todos los SKUs cotizados actualmente
+        const rows = (state.rowsCotizacion || []);
+        if (!rows.length) {
+            showToast('No hay productos para cotizar.', 'error');
+            return;
+        }
+        // Construir payload multi-SKU
+        const items = rows.map(row => {
+            // Normalizar SKU para evitar problemas de espacios/casos
+            const skuBuscado = (row.sku || '').toString().trim().toUpperCase();
+            const prod = (state.productos || []).find(p => (p.sku || '').toString().trim().toUpperCase() === skuBuscado) || {};
+            let descripcion = typeof prod.descripcion === 'string' && prod.descripcion.trim() ? prod.descripcion : '-';
+            let proveedor = typeof prod.proveedor === 'string' && prod.proveedor.trim() ? prod.proveedor : '-';
+            let origen = typeof prod.origen === 'string' && prod.origen.trim() ? prod.origen : '-';
+            // Asegurar que monto_propuesto sea numérico
+            let montoPropuesto = row.monto_propuesto !== undefined && row.monto_propuesto !== null ? Number(row.monto_propuesto) : Number(row.precio_vendedor_min);
+            return {
+                sku: row.sku,
+                descripcion,
+                cantidad: row.cantidad || 1,
+                precio_maximo: row.precio_maximo,
+                precio_vendedor_min: row.precio_vendedor_min,
+                monto_propuesto: montoPropuesto,
+                logo_path: row.logo_path || null,
+                proveedor,
+                origen
+            };
+        });
+        const payload = {
+            cliente: state.cliente || '',
+            items
+        };
+        console.log('Payload enviado a /cotizacion/pdf:', JSON.stringify(payload, null, 2));
+        try {
+            const response = await fetch(`${state.baseUrl}/cotizacion/pdf`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${state.auth}`
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!response.ok) {
+                showToast('Error al generar PDF', 'error');
+                return;
+            }
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `cotizacion_multiSKU.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+            showToast('PDF generado y descargado.', 'success');
+        } catch (err) {
+            showToast('Error al descargar PDF: ' + err.message, 'error');
+        }
+    }
+});
 
 // Escuchar cambios en monto propuesto y actualizar total negociado
 document.addEventListener('input', function(e) {
@@ -617,183 +709,7 @@ document.addEventListener('input', function(e) {
     }
 });
 
-// Validar monto propuesto solo al perder el foco
-selectors.landedTable.addEventListener('blur', function(e) {
-    if (e.target.classList.contains('monto-propuesto-input')) {
-        const input = e.target;
-        const sku = input.id.replace('monto-propuesto-', '');
-        const row = (state.rowsCotizacion || []).find(r => r.sku === sku);
-        if (!row) return;
-        let monto = parseFloat(input.value.replace(',', '.'));
-        if (isNaN(monto)) monto = row.precio_maximo;
-        if (monto < row.precio_vendedor_min) monto = row.precio_vendedor_min;
-        if (monto > row.precio_maximo) monto = row.precio_maximo;
-        monto = Math.round(monto);
-        input.value = monto;
-        // Actualizar total negociado
-        const cantidad = Math.round(row.cantidad);
-        const total = monto * cantidad;
-        const totalCell = document.getElementById(`total-negociado-${sku}`);
-        if (totalCell) totalCell.textContent = formatCurrency(total);
-    }
-}, true);
-
-function downloadExcel() {
-    if (state.landedData.length === 0) {
-        alert('No hay datos para descargar. Realiza una consulta primero.');
-        return;
-    }
-
-    const role = state.userRole || 'Vendedor';
-    
-    // Headers según rol - INCLUIR DETALLES DE PRODUCTOS
-    let headers, rows;
-    
-    if (role === 'Vendedor') {
-        headers = ['SKU', 'Descripción', 'Proveedor', 'Categoría', 'Transporte', 'Precio Máximo', 'Precio Mínimo'];
-        rows = state.landedData.map(row => {
-            const producto = state.productos.find(p => p.sku === row.sku) || {};
-            return [
-                row.sku,
-                producto.descripcion || '',
-                producto.proveedor || '',
-                producto.categoria || '',
-                row.transporte,
-                (row.precio_maximo ?? 0).toFixed(2),
-                (row.precio_vendedor_min ?? 0).toFixed(2)
-            ];
-        });
-    } else if (role === 'Gerencia_Comercial') {
-        headers = ['SKU', 'Descripción', 'Proveedor', 'Categoría', 'Transporte', 'Precio Máximo', 'Precio Mínimo'];
-        rows = state.landedData.map(row => {
-            const producto = state.productos.find(p => p.sku === row.sku) || {};
-            return [
-                row.sku,
-                producto.descripcion || '',
-                producto.proveedor || '',
-                producto.categoria || '',
-                row.transporte,
-                (row.precio_maximo ?? 0).toFixed(2),
-                (row.precio_gerente_com_min ?? 0).toFixed(2)
-            ];
-        });
-    } else if (role === 'Subdireccion' || role === 'Direccion' || role === 'Gerencia') {
-        headers = ['SKU', 'Descripción', 'Proveedor', 'Categoría', 'Origen', 'Transporte', 
-                   'Costo Base MXN', 'Flete %', 'Seguro %', 'Arancel %', 
-                   'DTA %', 'Hon. Aduanales %', 'Landed Cost', 'Mark-up Base', 'Precio Máximo', 'Precio Mínimo'];
-        rows = state.landedData.map(row => {
-            const producto = state.productos.find(p => p.sku === row.sku) || {};
-            const precioMin = role === 'Subdireccion' ? row.precio_subdireccion_min : 
-                             role === 'Direccion' ? row.precio_direccion_min : 
-                             row.precio_gerente_com_min;
-            return [
-                row.sku,
-                producto.descripcion || '',
-                producto.proveedor || '',
-                producto.categoria || '',
-                producto.origen || '',
-                row.transporte,
-                (row.costo_base_mxn ?? 0).toFixed(2),
-                ((row.flete_pct ?? 0) * 100).toFixed(2),
-                ((row.seguro_pct ?? 0) * 100).toFixed(2),
-                ((row.arancel_pct ?? 0) * 100).toFixed(2),
-                ((row.dta_pct ?? 0) * 100).toFixed(2),
-                ((row.honorarios_aduanales_pct ?? 0) * 100).toFixed(2),
-                (row.landed_cost_mxn ?? 0).toFixed(2),
-                (row.precio_base_mxn ?? 0).toFixed(2),
-                (row.precio_maximo ?? 0).toFixed(2),
-                (precioMin ?? 0).toFixed(2)
-            ];
-        });
-    } else {
-        // Admin ve todo
-        headers = ['SKU', 'Descripción', 'Proveedor', 'Categoría', 'Origen', 'Transporte',
-                   'Costo Base MXN', 'Flete %', 'Seguro %', 'Arancel %', 
-                   'DTA %', 'Hon. Aduanales %', 'Landed Cost', 'Mark-up Base',
-                   'Precio Máximo', 'Vendedor Min', 'Ger.Com Min', 'Subdir Min', 'Dirección Min'];
-        rows = state.landedData.map(row => {
-            const producto = state.productos.find(p => p.sku === row.sku) || {};
-            return [
-                row.sku,
-                producto.descripcion || '',
-                producto.proveedor || '',
-                producto.categoria || '',
-                producto.origen || '',
-                row.transporte,
-                (row.costo_base_mxn ?? 0).toFixed(2),
-                ((row.flete_pct ?? 0) * 100).toFixed(2),
-                ((row.seguro_pct ?? 0) * 100).toFixed(2),
-                ((row.arancel_pct ?? 0) * 100).toFixed(2),
-                ((row.dta_pct ?? 0) * 100).toFixed(2),
-                ((row.honorarios_aduanales_pct ?? 0) * 100).toFixed(2),
-                (row.landed_cost_mxn ?? 0).toFixed(2),
-                (row.precio_base_mxn ?? 0).toFixed(2),
-                (row.precio_maximo ?? 0).toFixed(2),
-                (row.precio_vendedor_min ?? 0).toFixed(2),
-                (row.precio_gerente_com_min ?? 0).toFixed(2),
-                (row.precio_subdireccion_min ?? 0).toFixed(2),
-                (row.precio_direccion_min ?? 0).toFixed(2)
-            ];
-        });
-    }
-
-    // Generar CSV
-    const csvContent = [
-        headers.join(','),
-        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
-    ].join('\n');
-
-    // Crear Blob y descargar
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-    
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Landed_Cost_${timestamp}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    selectors.status.textContent = `✅ Archivo descargado: Landed_Cost_${timestamp}.csv`;
-}
-
-// Event listeners
-selectors.clearSkusBtn.addEventListener('click', clearAllSkus);
-selectors.downloadExcelBtn.addEventListener('click', downloadExcel);
-
-// Event delegation para botones dinámicos
-selectors.skuInputsContainer.addEventListener('click', (e) => {
-    if (e.target.classList.contains('add-sku')) {
-        addSkuInput();
-    } else if (e.target.classList.contains('remove')) {
-        removeSkuInput(e.target);
-    }
-});
-// Adjuntar eventos a los steppers al cargar la página
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('.sku-input-row').forEach(attachStepperEvents);
-});
-
-// Debounce en inputs de SKU
-selectors.skuInputsContainer.addEventListener('input', (e) => {
-    if (e.target.classList.contains('sku-input')) {
-        clearTimeout(state.debounceTimer);
-        state.debounceTimer = setTimeout(loadLanded, 500);
-    }
-});
-
-const actions = {
-    'load-landed': loadLanded,
-};
-
-document.addEventListener('click', (event) => {
-    const action = event.target.dataset?.action;
-    if (action && actions[action]) {
-        actions[action]();
-    }
-});
+// ...evento duplicado eliminado...
 
 // =====================================
 // FUNCIONALIDAD DE AUTORIZACIONES
@@ -993,20 +909,11 @@ if (state.auth) {
     loadProductos();
 }
 
-// Service Worker desactivado temporalmente
-// if ('serviceWorker' in navigator) {
-//     window.addEventListener('load', () => {
-//         navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('SW error', err));
-//     });
-// }
-
 // --- Timeout de sesión por inactividad ---
-let lastActivity = Date.now();
+let lastActivity = Date.now(); // Declare and initialize lastActivity
 const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutos
-
 document.addEventListener('click', () => lastActivity = Date.now());
 document.addEventListener('keypress', () => lastActivity = Date.now());
-
 setInterval(() => {
     if (state.auth && Date.now() - lastActivity > SESSION_TIMEOUT) {
         alert('Sesión expirada por inactividad. Por favor, inicia sesión nuevamente.');
@@ -1016,3 +923,59 @@ setInterval(() => {
     }
 }, 60000);
 // --- Fin timeout de sesión ---
+
+// --- EVENTOS PARA ACTUALIZAR COTIZACIÓN DINÁMICAMENTE ---
+// Actualizar cotización al cambiar SKU o cantidad
+// Llama loadLanded() cuando se edita un SKU o cantidad
+// (Evita loops infinitos: loadLanded solo actualiza la tabla)
+
+// Delegación de eventos para toda la interfaz de cotización
+document.addEventListener('click', function(e) {
+    // Botón + cantidad
+    if (e.target.classList.contains('stepper-plus')) {
+        const input = e.target.closest('.cantidad-stepper')?.querySelector('.cantidad-input');
+        if (input) {
+            let val = parseInt(input.value) || 1;
+            input.value = val + 1;
+            input.dispatchEvent(new Event('input'));
+        }
+    }
+    // Botón - cantidad
+    if (e.target.classList.contains('stepper-minus')) {
+        const input = e.target.closest('.cantidad-stepper')?.querySelector('.cantidad-input');
+        if (input) {
+            let val = parseInt(input.value) || 1;
+            if (val > 1) input.value = val - 1;
+            input.dispatchEvent(new Event('input'));
+        }
+    }
+    // Botón agregar SKU
+    if (e.target.classList.contains('add-sku')) {
+        addSkuInput();
+        setTimeout(loadLanded, 100);
+    }
+    // Botón quitar SKU
+    if (e.target.classList.contains('remove')) {
+        removeSkuInput(e.target);
+        setTimeout(loadLanded, 100);
+    }
+    // Botón Consultar
+    if (e.target.matches('[data-action="load-landed"]')) {
+        e.preventDefault();
+        loadLanded();
+    }
+    // Botón Limpiar
+    if (e.target.id === 'clear-skus') {
+        clearAllSkus();
+    }
+});
+
+// Actualizar cotización al cambiar SKU o cantidad
+document.addEventListener('input', function(e) {
+    if (e.target.classList.contains('sku-input') || e.target.classList.contains('cantidad-input')) {
+        loadLanded();
+    }
+});
+
+// Cierre automático de cualquier bloque abierto (por si acaso)
+// (No se agrega código funcional, solo se asegura el cierre de bloques)
