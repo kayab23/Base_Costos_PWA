@@ -377,7 +377,10 @@ function addSkuInput() {
         <button class="icon-btn remove" title="Quitar SKU">×</button>
     `;
     selectors.skuInputsContainer.appendChild(newRow);
-    attachStepperEvents(newRow);
+    // Reaplicar eventos a todas las filas para asegurar que todos los steppers funcionen
+    document.querySelectorAll('.sku-input-row').forEach(row => {
+        attachStepperEvents(row);
+    });
 }
 
 function attachStepperEvents(row) {
@@ -391,19 +394,24 @@ function attachStepperEvents(row) {
         input.style.pointerEvents = 'auto';
         input.style.userSelect = 'auto';
     }
+    // Eliminar listeners previos usando cloneNode
     if (minusBtn) {
-        minusBtn.disabled = false;
-        minusBtn.style.pointerEvents = 'auto';
-        minusBtn.addEventListener('click', () => {
+        const newMinusBtn = minusBtn.cloneNode(true);
+        minusBtn.parentNode.replaceChild(newMinusBtn, minusBtn);
+        newMinusBtn.disabled = false;
+        newMinusBtn.style.pointerEvents = 'auto';
+        newMinusBtn.addEventListener('click', () => {
             let val = parseInt(input.value) || 1;
             if (val > 1) input.value = val - 1;
             input.dispatchEvent(new Event('input'));
         });
     }
     if (plusBtn) {
-        plusBtn.disabled = false;
-        plusBtn.style.pointerEvents = 'auto';
-        plusBtn.addEventListener('click', () => {
+        const newPlusBtn = plusBtn.cloneNode(true);
+        plusBtn.parentNode.replaceChild(newPlusBtn, plusBtn);
+        newPlusBtn.disabled = false;
+        newPlusBtn.style.pointerEvents = 'auto';
+        newPlusBtn.addEventListener('click', () => {
             let val = parseInt(input.value) || 1;
             input.value = val + 1;
             input.dispatchEvent(new Event('input'));
@@ -595,9 +603,7 @@ function renderPriceRow(row) {
         <td class="price-col">${formatCurrency(precioMax * row.cantidad)}</td>
         <td class="price-col" id="total-negociado-${row.sku}">${totalNegociado}</td>
         <td class="price-col">${formatCurrency(precioMin * row.cantidad)}</td>
-        <td class="price-col">
-            <button class="pdf-cotizar-btn" data-sku="${row.sku}">PDF Cotización</button>
-        </td>
+        <!-- Botón PDF Cotización por SKU eliminado. Usar solo el botón global para cotizar uno o varios SKUs. -->
     </tr>`;
     return html;
 }
@@ -931,24 +937,7 @@ setInterval(() => {
 
 // Delegación de eventos para toda la interfaz de cotización
 document.addEventListener('click', function(e) {
-    // Botón + cantidad
-    if (e.target.classList.contains('stepper-plus')) {
-        const input = e.target.closest('.cantidad-stepper')?.querySelector('.cantidad-input');
-        if (input) {
-            let val = parseInt(input.value) || 1;
-            input.value = val + 1;
-            input.dispatchEvent(new Event('input'));
-        }
-    }
-    // Botón - cantidad
-    if (e.target.classList.contains('stepper-minus')) {
-        const input = e.target.closest('.cantidad-stepper')?.querySelector('.cantidad-input');
-        if (input) {
-            let val = parseInt(input.value) || 1;
-            if (val > 1) input.value = val - 1;
-            input.dispatchEvent(new Event('input'));
-        }
-    }
+    // (El manejo de los botones stepper se realiza solo en attachStepperEvents para evitar doble incremento)
     // Botón agregar SKU
     if (e.target.classList.contains('add-sku')) {
         addSkuInput();
