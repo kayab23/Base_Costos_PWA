@@ -1,12 +1,9 @@
-"""Configuración básica del backend."""
-from __future__ import annotations
 
+from __future__ import annotations
 import os
 from dataclasses import dataclass, field
-
 from cost_engine import DEFAULT_CONN_STR
 from dotenv import load_dotenv
-
 load_dotenv()
 
 
@@ -29,6 +26,5 @@ class Settings:
     log_level: str = os.getenv("LOG_LEVEL", "INFO")
     log_file: str = os.getenv("LOG_FILE", "logs/app.log")
     environment: str = os.getenv("ENVIRONMENT", "development")
-
 
 settings = Settings()

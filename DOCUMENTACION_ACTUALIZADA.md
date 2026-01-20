@@ -1,4 +1,4 @@
-# Documentación de Proyecto: Base_Costos (Actualización al 14/01/2026)
+# Documentación de Proyecto: Base_Costos (Actualización al 19/01/2026)
 
 ## 1. Esquema de Base de Datos (BD_Calculo_Costos)
 
@@ -8,11 +8,11 @@ Tablas principales:
 - **ListasPrecios**: Precios calculados por SKU y tipo de cliente.
 - **PreciosCalculados**: Precios mínimos, máximos y márgenes por SKU.
 - **SolicitudesAutorizacion**: Flujo de autorizaciones jerárquicas de descuentos.
-- **Productos**: Catálogo principal de productos, incluye columna `costo_base` y `fecha_actualizacion`.
+- **Productos**: Catálogo principal de productos, incluye columna `costo_base`, `proveedor`, `origen`, `fecha_actualizacion`.
 - **ParametrosImportacion**: Parámetros de importación y costos asociados.
 - **LandedCostCache**: Cálculo de landed cost por SKU y transporte.
 
-Tablas eliminadas/no usadas: Versiones, CostosBase, PoliticasMargen, ControlVersiones.
+Tablas eliminadas/no usadas: Versiones, CostosBase, PoliticasMargen, ControlVersiones, sync_excel.py.
 
 ## 2. Backend y Conexión
 - Conexión centralizada en `app/db.py` y `app/config.py` usando `pyodbc` y la variable de entorno `SQLSERVER_CONN`.
@@ -28,21 +28,21 @@ Tablas eliminadas/no usadas: Versiones, CostosBase, PoliticasMargen, ControlVers
     ```
 - **No se utiliza plantilla Excel ni scripts de sincronización.**
 
-## 4. Flujo de Autorizaciones
-- Solicitudes gestionadas en la tabla `SolicitudesAutorizacion`.
-- Roles: Vendedor, Gerencia_Comercial, Subdireccion, Direccion, admin.
-- Lógica jerárquica validada y corregida para todos los niveles.
+## 4. Flujo de Cotización PDF Multi-SKU
+- El frontend arma el payload con todos los SKUs cotizados y sus detalles (incluyendo proveedor y origen).
+- El backend valida y genera el PDF correctamente.
+- Se corrigió bug de campos faltantes y se eliminó código duplicado.
 
 ## 5. Monitoreo, Pruebas y Deployment
 - Endpoint `/health` y pruebas automáticas (`pytest`, `playwright`).
 - Script `deploy.ps1` para automatizar pruebas, backup, migraciones y reinicio de servicios.
 - Documentación de contingencia y checklist en `PLAN_PRODUCCION.md`, `CHECKLIST_PREPRODUCCION.md` y `QUICK_START_PRODUCCION.md`.
 
-## 6. Estado y Operación Actual
-- El modelo, backend y scripts están alineados con el uso real y la estructura de la base.
-- Todas las actualizaciones de productos y precios se hacen directamente en SQL Server.
-- El sistema está listo para operación, monitoreo y futuras mejoras.
+## 6. Limpieza y Buenas Prácticas (2026-01-19)
+- Eliminado sync_excel.py y referencias a sincronización por Excel.
+- Limpieza de eventos duplicados y código muerto en frontend.
+- Documentación y archivos .md actualizados.
 
 ---
 
-**Última actualización:** 14/01/2026
+**Última actualización:** 19/01/2026

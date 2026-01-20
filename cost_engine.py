@@ -159,15 +159,17 @@ def calculate_landed_costs(
         costo_base_mxn = costo_base * tc
 
         # Obtener categoría del producto
-        categoria = (producto.get("categoria") or "").strip()
-        
-        # Determinar el flete según tipo de transporte (REEMPLAZA valores de 120% y 30%)
-        if transporte_key == "aereo":
-            flete_pct = 0.10  # 10% para transporte Aéreo
-        elif transporte_key == "maritimo":
-            flete_pct = 0.05  # 5% para transporte Marítimo
+        categoria = (producto.get("categoria") or "").strip().lower()
+        # Solo aplica flete si es equipo o insumo
+        if categoria in ["equipo", "insumo"]:
+            if transporte_key == "aereo":
+                flete_pct = 0.10  # 10% para transporte Aéreo
+            elif transporte_key == "maritimo":
+                flete_pct = 0.05  # 5% para transporte Marítimo
+            else:
+                flete_pct = 0.0
         else:
-            flete_pct = 0.0  # Sin flete para otros casos
+            flete_pct = 0.0  # Otras categorías no pagan flete
 
         origen = (producto.get("origen") or "").strip().lower()
         if origen == "importado":

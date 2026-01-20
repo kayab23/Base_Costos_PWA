@@ -1,16 +1,45 @@
-"""Modelos Pydantic para las respuestas y peticiones del API."""
+
 from __future__ import annotations
+# Esquema para cotización PDF del rol vendedor
+from typing import Optional, List
+from pydantic import BaseModel, Field
+
+
+# Nuevo esquema para PDF multi-SKU
+class CotizacionItemPDF(BaseModel):
+    sku: str
+    descripcion: Optional[str]
+    cantidad: int
+    precio_maximo: float
+    precio_vendedor_min: float
+    monto_propuesto: float
+    logo_path: Optional[str] = None
+    proveedor: Optional[str] = None
+    origen: Optional[str] = None
+
+class CotizacionVendedorPDF(BaseModel):
+    items: list[CotizacionItemPDF]
+    cliente: str
+"""Modelos Pydantic para las respuestas y peticiones del API."""
 
 from datetime import date, datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
 
 
 class UserInfo(BaseModel):
     usuario_id: int
     username: str
     rol: str
+
+
+class Token(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+
+class TokenRefreshRequest(BaseModel):
+    refresh_token: str
 
 
 class Producto(BaseModel):
