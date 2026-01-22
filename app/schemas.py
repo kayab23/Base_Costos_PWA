@@ -10,7 +10,9 @@ class CotizacionItemPDF(BaseModel):
     sku: str
     descripcion: Optional[str]
     cantidad: int
-    precio_maximo: float
+    # Compatibilidad: accept both old and new field names
+    precio_maximo: Optional[float] = None
+    precio_maximo_lista: Optional[float] = None
     precio_vendedor_min: float
     monto_propuesto: float
     logo_path: Optional[str] = None
@@ -134,7 +136,11 @@ class ListaPrecio(BaseModel):
     transporte: str
     landed_cost_mxn: Optional[float]
     precio_base_mxn: Optional[float]  # Mark-up base
-    precio_maximo: Optional[float]  # Mark-up × 2
+    # Compatibilidad: mantener `precio_maximo` y exponer `precio_maximo_lista`
+    precio_maximo: Optional[float]  # Mark-up × 2 (antiguo)
+    precio_maximo_lista: Optional[float]  # Precio Máximo de Lista (nuevo nombre)
+    # Precio mínimo de lista (nuevo campo, mapeado desde precio_vendedor_min)
+    precio_minimo_lista: Optional[float]
     precio_vendedor_min: Optional[float]  # 20% descuento del Precio Máximo
     precio_gerente_com_min: Optional[float]  # 25% descuento del Precio Máximo
     precio_subdireccion_min: Optional[float]  # 30% descuento del Precio Máximo

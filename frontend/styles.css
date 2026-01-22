@@ -448,6 +448,8 @@ button.primary:hover {
 }
 .cantidad-input {
     -moz-appearance: textfield;
+    -webkit-appearance: textfield;
+    appearance: textfield;
 }
 
 /* Ocultar flechas de los inputs tipo number en todos los navegadores para Monto Propuesto */
@@ -458,6 +460,8 @@ button.primary:hover {
 }
 .monto-propuesto-input {
     -moz-appearance: textfield;
+    -webkit-appearance: textfield;
+    appearance: textfield;
 }
 
 @media (max-width: 640px) {

@@ -9,24 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import threading
-from fastapi import Response
-from .db import connection_scope
-
-from fastapi import FastAPI
-from slowapi import _rate_limit_exceeded_handler
-from app.limiter import limiter
-from slowapi.errors import RateLimitExceeded
-from fastapi.middleware.cors import CORSMiddleware
-
-from .config import settings
-from .routes import catalog, pricing, auth, autorizaciones, pdf
-from .logger import logger
-
-from datetime import datetime, timezone
-import threading
-from fastapi import Response
-from .db import connection_scope
-from fastapi import FastAPI
+from fastapi import Response, FastAPI
 from slowapi import _rate_limit_exceeded_handler
 from app.limiter import limiter
 from slowapi.errors import RateLimitExceeded
@@ -34,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .routes import catalog, pricing, auth, autorizaciones, pdf
 from .logger import logger
+from .db import connection_scope
 
 # Inicializar aplicación FastAPI con configuración desde settings
 app = FastAPI(title=settings.api_title, version=settings.api_version)
@@ -49,14 +33,14 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Registrar routers de cada módulo funcional (sin duplicados)
+# Registrar routers de cada módulo funcional
 app.include_router(auth.router)
 app.include_router(catalog.router)
 app.include_router(pricing.router)
 app.include_router(autorizaciones.router)
 app.include_router(pdf.router)
 
-# Variables para métricas simples
+# Variables para métricas simples (única definición)
 start_time = datetime.now(timezone.utc)
 metrics = {
     'requests_total': 0,
@@ -132,5 +116,6 @@ def metrics_endpoint():
             f"uptime_seconds {(datetime.now(timezone.utc) - start_time).total_seconds():.0f}",
         ]
         if metrics['last_error']:
-            lines.append(f"last_error \"{metrics['last_error']}\"")
+            # Añadir como métrica de texto para debugging
+            lines.append(f'last_error "{metrics["last_error"]}"')
     return Response("\n".join(lines), media_type="text/plain")
