@@ -65,15 +65,6 @@ metrics = {
 }
 metrics_lock = threading.Lock()
 
-# Variables globales para métricas simples
-start_time = datetime.now(timezone.utc)  # Marca de inicio de la app
-metrics = {
-    'requests_total': 0,  # Total de peticiones HTTP
-    'errors_total': 0,    # Total de errores
-    'last_error': '',     # Último error registrado
-}
-metrics_lock = threading.Lock()  # Lock para acceso concurrente seguro
-
 
 @app.get("/health")
 def healthcheck():
@@ -105,60 +96,6 @@ def healthcheck():
         "default_transporte": settings.default_transporte,
         "default_monedas": settings.default_monedas,
     }
-
-
-
-# Middleware para contar peticiones y errores y loguear headers y auth
-@app.middleware("http")
-async def debug_and_metrics_middleware(request, call_next):
-    with metrics_lock:
-        metrics['requests_total'] += 1
-    # Log headers y path
-    logger.warning(f"[DEBUG-MIDDLEWARE] path={request.url.path} headers={{'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}}")
-    try:
-        response = await call_next(request)
-        return response
-    except Exception as e:
-        with metrics_lock:
-            metrics['errors_total'] += 1
-            metrics['last_error'] = str(e)
-        raise
-
-
-@app.get("/metrics")
-def metrics_endpoint():
-    """Endpoint Prometheus-like para métricas básicas."""
-    with metrics_lock:
-        lines = [
-            f"requests_total {metrics['requests_total']}",
-            f"errors_total {metrics['errors_total']}",
-            f"uptime_seconds {(datetime.now(timezone.utc) - start_time).total_seconds():.0f}",
-        ]
-        if metrics['last_error']:
-            import logging
-            db_status = "ok"
-            db_error = None
-            logging.warning(f"[DEBUG-HEALTH] Iniciando healthcheck. Cadena de conexión: {settings.sqlserver_conn}")
-
-            try:
-                with connection_scope() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT 1")
-                    cursor.fetchone()
-                    logging.warning("[DEBUG-HEALTH] Conexión a BD exitosa.")
-            except Exception as e:
-                db_status = "error"
-                db_error = str(e)
-                logging.error(f"[DEBUG-HEALTH] Error de conexión a BD: {db_error}")
-
-            return {
-                "status": "ok" if db_status == "ok" else "degraded",
-                "db_status": db_status,
-                "db_error": db_error,
-                "uptime_seconds": (datetime.now(timezone.utc) - start_time).total_seconds(),
-                "default_transporte": settings.default_transporte,
-                "default_monedas": settings.default_monedas,
-            }
 # Middleware para métricas y debug de headers/auth
 @app.middleware("http")
 async def debug_and_metrics_middleware(request, call_next):
