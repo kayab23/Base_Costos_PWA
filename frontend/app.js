@@ -126,7 +126,12 @@ selectors.connectBtn.addEventListener('click', async () => {
     document.querySelectorAll('.card').forEach(card => {
         card.style.display = '';
     });
-    console.log('Botón clickeado');
+    // Mostrar indicador inmediato para que los tests E2E detecten el elemento
+    if (selectors.userRole) {
+        selectors.userRole.textContent = 'Rol: Conectando...';
+        selectors.userRole.style.display = 'block';
+    }
+    // login button clicked
     try {
         selectors.status.textContent = 'Conectando...';
         selectors.connectBtn.style.display = 'none';
@@ -135,8 +140,7 @@ selectors.connectBtn.addEventListener('click', async () => {
         const username = selectors.username.value.trim();
         const password = selectors.password.value;
 
-        console.log('URL:', state.baseUrl);
-        console.log('Usuario:', username);
+        // connecting to URL and attempting login
 
         // Health check antes de login
         const healthResp = await fetch(`${state.baseUrl}/health`);
@@ -174,15 +178,13 @@ selectors.connectBtn.addEventListener('click', async () => {
         localStorage.setItem('apiUrl', state.baseUrl);
         selectors.status.textContent = `Conectado. ${state.productos.length} productos cargados.`;
         selectors.userRole.textContent = `Rol: ${state.userRole}`;
-        console.log('[LOGIN] Rol recibido:', state.userRole);
         selectors.userRole.style.display = 'block';
-        console.log('[LOGIN] #user-role display:', selectors.userRole.style.display);
         selectors.connectBtn.style.display = 'none';
         if (logoutBtn) logoutBtn.style.display = '';
 
         updateUIForRole();
         showToast('Inicio de sesión exitoso.', 'success');
-        console.log('Autenticación exitosa');
+        // autenticación exitosa
         if (state.userRole === 'Vendedor') {
             const aprobacionesSection = document.getElementById('procesadas-section');
             if (aprobacionesSection) aprobacionesSection.style.display = 'none';
@@ -207,7 +209,7 @@ async function loadProductos() {
     try {
         const data = await apiFetch('/catalog/productos');
         state.productos = data;
-        console.log('[DEBUG] Catálogo productos:', data); // <-- Línea de depuración
+        // catálogo productos cargado (debug logs removed)
         // Poblar datalist para autocompletado
         selectors.skuList.innerHTML = data
             .map((p) => {
@@ -554,23 +556,14 @@ function updateUIForRole() {
 // Nueva función: Renderizar fila según rol
 function renderPriceRow(row) {
     const role = state.userRole || 'Vendedor';
-    let precioMax, precioMin;
-    if (role === 'Vendedor') {
-        precioMax = row.precio_maximo;
-        precioMin = row.precio_vendedor_min;
-    } else if (role === 'Gerencia_Comercial') {
-        precioMax = row.precio_maximo;
-        precioMin = row.precio_gerente_com_min;
-    } else if (role === 'Subdireccion') {
-        precioMax = row.precio_maximo;
-        precioMin = row.precio_subdireccion_min;
-    } else if (role === 'Direccion') {
-        precioMax = row.precio_maximo;
-        precioMin = row.precio_direccion_min;
-    } else {
-        precioMax = row.precio_maximo;
-        precioMin = row.precio_direccion_min;
-    }
+    // Prefer the new "lista" field names but fall back to legacy ones
+    let precioMax = row.precio_maximo_lista ?? row.precio_maximo;
+    let precioMin = row.precio_minimo_lista ?? (
+        role === 'Vendedor' ? row.precio_vendedor_min :
+        role === 'Gerencia_Comercial' ? row.precio_gerente_com_min :
+        role === 'Subdireccion' ? row.precio_subdireccion_min :
+        role === 'Direccion' ? row.precio_direccion_min : row.precio_direccion_min
+    );
     const montoPropuestoId = `monto-propuesto-${row.sku}`;
     // Usar el monto propuesto previo si existe
     let montoPropuesto = row.monto_propuesto !== undefined ? row.monto_propuesto : '';
@@ -601,6 +594,8 @@ function renderPriceRow(row) {
         </td>
         <td class="price-col">${formatCurrency(precioMin)}</td>
         <td class="price-col">${formatCurrency(precioMax * row.cantidad)}</td>
+        <td class="price-col" id="iva-cell-${row.sku}">${formatCurrency((montoPropuesto && !isNaN(parseFloat(montoPropuesto))) ? Math.round((parseFloat(montoPropuesto) * row.cantidad * 0.16)) : 0)}</td>
+        <td class="price-col" id="descuento-cell-${row.sku}">${(montoPropuesto && !isNaN(parseFloat(montoPropuesto)) && precioMax) ? ((Math.max(0, (precioMax - parseFloat(montoPropuesto)) / precioMax) * 100).toFixed(2) + '%') : '-'}</td>
         <td class="price-col" id="total-negociado-${row.sku}">${totalNegociado}</td>
         <td class="price-col">${formatCurrency(precioMin * row.cantidad)}</td>
         <!-- Botón PDF Cotización por SKU eliminado. Usar solo el botón global para cotizar uno o varios SKUs. -->
@@ -626,28 +621,30 @@ document.addEventListener('click', async function(e) {
             // Normalizar SKU para evitar problemas de espacios/casos
             const skuBuscado = (row.sku || '').toString().trim().toUpperCase();
             const prod = (state.productos || []).find(p => (p.sku || '').toString().trim().toUpperCase() === skuBuscado) || {};
-            let descripcion = typeof prod.descripcion === 'string' && prod.descripcion.trim() ? prod.descripcion : '-';
-            let proveedor = typeof prod.proveedor === 'string' && prod.proveedor.trim() ? prod.proveedor : '-';
-            let origen = typeof prod.origen === 'string' && prod.origen.trim() ? prod.origen : '-';
-            // Asegurar que monto_propuesto sea numérico
-            let montoPropuesto = row.monto_propuesto !== undefined && row.monto_propuesto !== null ? Number(row.monto_propuesto) : Number(row.precio_vendedor_min);
-            return {
-                sku: row.sku,
-                descripcion,
-                cantidad: row.cantidad || 1,
-                precio_maximo: row.precio_maximo,
-                precio_vendedor_min: row.precio_vendedor_min,
-                monto_propuesto: montoPropuesto,
-                logo_path: row.logo_path || null,
-                proveedor,
-                origen
-            };
+                let descripcion = typeof prod.descripcion === 'string' && prod.descripcion.trim() ? prod.descripcion : '-';
+                let proveedor = typeof prod.proveedor === 'string' && prod.proveedor.trim() ? prod.proveedor : '-';
+                let origen = typeof prod.origen === 'string' && prod.origen.trim() ? prod.origen : '-';
+                // Asegurar que monto_propuesto sea numérico
+                let montoPropuesto = row.monto_propuesto !== undefined && row.monto_propuesto !== null ? Number(row.monto_propuesto) : Number(row.precio_vendedor_min || row.precio_minimo_lista || 0);
+                return {
+                    sku: row.sku,
+                    descripcion,
+                    cantidad: row.cantidad || 1,
+                    precio_maximo: row.precio_maximo,
+                    precio_maximo_lista: row.precio_maximo_lista ?? row.precio_maximo,
+                    precio_vendedor_min: row.precio_vendedor_min,
+                    precio_minimo_lista: row.precio_minimo_lista ?? row.precio_vendedor_min,
+                    monto_propuesto: montoPropuesto,
+                    logo_path: row.logo_path || null,
+                    proveedor,
+                    origen
+                };
         });
         const payload = {
             cliente: state.cliente || '',
             items
         };
-        console.log('Payload enviado a /cotizacion/pdf:', JSON.stringify(payload, null, 2));
+        // payload enviado a /cotizacion/pdf (logging removed)
         try {
             const response = await fetch(`${state.baseUrl}/cotizacion/pdf`, {
                 method: 'POST',
@@ -693,6 +690,20 @@ document.addEventListener('input', function(e) {
         const total = montoNum * cantidad;
         const totalCell = document.getElementById(`total-negociado-${sku}`);
         if (totalCell) totalCell.textContent = formatCurrency(total);
+        // Actualizar IVA (por unidad) y descuento%
+        const ivaCell = document.getElementById(`iva-cell-${sku}`);
+        const descuentoCell = document.getElementById(`descuento-cell-${sku}`);
+        const precioMax = row.precio_maximo_lista ?? row.precio_maximo;
+        const totalIva = Math.round(montoNum * cantidad * 0.16);
+        if (ivaCell) ivaCell.textContent = formatCurrency(totalIva);
+        if (descuentoCell) {
+            if (montoNum > 0 && precioMax) {
+                const pct = Math.max(0, (precioMax - montoNum) / precioMax) * 100;
+                descuentoCell.textContent = pct.toFixed(2) + '%';
+            } else {
+                descuentoCell.textContent = '-';
+            }
+        }
     }
     // Actualizar Total Negociado si cambia la cantidad
     if (e.target.classList.contains('cantidad-input')) {
@@ -712,6 +723,19 @@ document.addEventListener('input', function(e) {
         const total = Math.round(monto) * cantidad;
         const totalCell = document.getElementById(`total-negociado-${sku}`);
         if (totalCell) totalCell.textContent = formatCurrency(total);
+        // También actualizar IVA y descuento cuando cambia la cantidad (IVA por unidad permanece)
+        const ivaCellQty = document.getElementById(`iva-cell-${sku}`);
+        const descuentoCellQty = document.getElementById(`descuento-cell-${sku}`);
+        const precioMaxQty = row.precio_maximo_lista ?? row.precio_maximo;
+        if (ivaCellQty) ivaCellQty.textContent = formatCurrency(Math.round(monto * cantidad * 0.16));
+        if (descuentoCellQty) {
+            if (monto > 0 && precioMaxQty) {
+                const pct = Math.max(0, (precioMaxQty - monto) / precioMaxQty) * 100;
+                descuentoCellQty.textContent = pct.toFixed(2) + '%';
+            } else {
+                descuentoCellQty.textContent = '-';
+            }
+        }
     }
 });
 
@@ -871,7 +895,7 @@ async function aprobarSolicitud(id) {
     const comentarios = prompt('Comentarios (opcional):');
     if (comentarios === null) return; // Usuario canceló
     try {
-        console.log('AprobarSolicitud: method=PUT, Authorization:', state.auth);
+        // aprobar solicitud (debug logging removed)
         await apiFetch(`/autorizaciones/${id}/aprobar`, {
             method: 'PUT',
             body: JSON.stringify({ comentarios })
@@ -889,7 +913,7 @@ async function rechazarSolicitud(id) {
     const comentarios = prompt('Motivo del rechazo (opcional):');
     if (comentarios === null) return; // Usuario canceló
     try {
-        console.log('RechazarSolicitud: method=PUT, Authorization:', state.auth);
+        // rechazar solicitud (debug logging removed)
         await apiFetch(`/autorizaciones/${id}/rechazar`, {
             method: 'PUT',
             body: JSON.stringify({ comentarios })

@@ -5,6 +5,28 @@ Módulo para generación de PDFs de política de entrega y datos bancarios.
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 import io
+from decimal import Decimal
+
+# Try to use num2words if available for amount-in-words; otherwise fallback
+try:
+    from num2words import num2words
+    def number_to_words_es(amount: float) -> str:
+        # num2words handles floats with to='currency' poorly; convert to integer pesos and cents
+        try:
+            pesos = int(Decimal(amount))
+            cents = int((Decimal(str(amount)) - Decimal(pesos)) * 100)
+        except Exception:
+            return str(amount)
+        if cents:
+            return f"{num2words(pesos, lang='es').capitalize()} pesos {num2words(cents, lang='es')} centavos"
+        return f"{num2words(pesos, lang='es').capitalize()} pesos"
+except Exception:
+    def number_to_words_es(amount: float) -> str:
+        # Fallback: return formatted number as text
+        try:
+            return f"{amount:,.2f} MXN"
+        except Exception:
+            return str(amount)
 
 # Función principal para generar PDF de política de entrega y datos bancarios
 def generar_pdf_politica_entrega(datos: dict) -> bytes:
@@ -12,23 +34,18 @@ def generar_pdf_politica_entrega(datos: dict) -> bytes:
     c = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
 
-    # Logo (opcional, si se provee ruta en el primer item)
+    # Logo Vitaris (siempre usar el logo oficial)
     y = height - 60
-    logo_path = None
-    if 'items' in datos and datos['items']:
-        logo_path = datos['items'][0].get('logo_path')
-    if logo_path:
-        try:
-            c.drawImage(logo_path, 40, y, width=120, height=60)
-            y -= 70
-        except Exception:
-            y -= 10
-    else:
+    logo_path = 'app/pdf/logo.png'  # Ruta relativa al backend, asegúrate de que exista
+    try:
+        c.drawImage(logo_path, 40, y, width=120, height=60, mask='auto')
+        y -= 70
+    except Exception:
         y -= 10
 
-    # Encabezado principal
+    # Encabezado principal con color azul institucional (como en los otros PDF)
     c.setFont("Helvetica-Bold", 22)
-    c.setFillColorRGB(0.13, 0.45, 0.29)
+    c.setFillColorRGB(0.09, 0.29, 0.55)  # Azul institucional (aprox #185b8c)
     c.drawString(40, y, "Cotización Oficial")
     c.setFillColorRGB(0, 0, 0)
     y -= 35
@@ -37,47 +54,90 @@ def generar_pdf_politica_entrega(datos: dict) -> bytes:
     c.drawString(40, y, f"Cliente: {datos.get('cliente', '-').upper()}")
     y -= 25
 
-    # Tabla de SKUs cotizados
+    # Tabla de SKUs cotizados con fondo blanco, encabezados azules y líneas divisorias suaves
     c.setFont("Helvetica-Bold", 12)
     c.drawString(40, y, "Productos Cotizados:")
     y -= 18
     c.setFont("Helvetica-Bold", 10)
-    headers = ["SKU", "Cantidad", "Monto Propuesto", "Total"]
-    col_widths = [80, 60, 110, 110]
-    x = 40
+    headers = ["SKU", "Cantidad", "Monto Propuesto", "IVA 16%", "Descuento %", "Total"]
+    col_widths = [70, 60, 90, 70, 70, 90]
+    x_start = 40
+    x = x_start
+    # Encabezados (texto azul, fondo blanco)
     for i, h in enumerate(headers):
-        c.drawString(x, y, h)
+        c.setFillColorRGB(1, 1, 1)
+        c.rect(x, y-2, col_widths[i], 16, fill=1, stroke=0)
+        c.setFillColorRGB(0.09, 0.29, 0.55)  # Azul institucional
+        c.drawString(x+4, y, h)
         x += col_widths[i]
-    y -= 14
+    y -= 16
     c.setFont("Helvetica", 10)
     total_global = 0
     for item in datos.get('items', []):
         if y < 80:
             c.showPage()
             y = height - 60
-        x = 40
+            x = x_start
+        x = x_start
         cantidad = int(item.get('cantidad', 1) or 1)
         monto_propuesto = float(item.get('monto_propuesto', 0) or 0)
-        total = monto_propuesto * cantidad
+        # Determine precio_maximo_lista with fallbacks
+        precio_maximo_lista = None
+        if item.get('precio_maximo_lista'):
+            precio_maximo_lista = float(item.get('precio_maximo_lista'))
+        elif item.get('precio_maximo'):
+            precio_maximo_lista = float(item.get('precio_maximo'))
+        else:
+            precio_maximo_lista = 0.0
+
+        iva = monto_propuesto * 0.16
+        total = (monto_propuesto + iva) * cantidad
         total_global += total
+        # Calculate discount percentage relative to precio_maximo_lista
+        try:
+            if precio_maximo_lista > 0:
+                descuento_pct = max(0.0, 100.0 * (1.0 - (monto_propuesto / precio_maximo_lista)))
+            else:
+                descuento_pct = 0.0
+        except Exception:
+            descuento_pct = 0.0
+
         row = [
             item.get('sku', '-'),
             str(cantidad),
             f"${monto_propuesto:,.2f}",
+            f"${iva:,.2f}",
+            f"{descuento_pct:.2f}%",
             f"${total:,.2f}"
         ]
         for i, val in enumerate(row):
-            c.drawString(x, y, str(val))
+            c.setFillColorRGB(1, 1, 1)
+            c.rect(x, y-2, col_widths[i], 14, fill=1, stroke=0)
+            c.setFillColorRGB(0, 0, 0)
+            c.drawString(x+4, y, str(val))
             x += col_widths[i]
         y -= 14
+        # Línea divisoria
+        c.setStrokeColorRGB(0.85, 0.85, 0.85)
+        c.setLineWidth(0.5)
+        c.line(x_start, y+12, x_start+sum(col_widths), y+12)
 
     # Total global
     y -= 10
     c.setFont("Helvetica-Bold", 12)
-    c.setFillColorRGB(0.13, 0.45, 0.29)
+    c.setFillColorRGB(0.09, 0.29, 0.55)
     c.drawString(40, y, f"MONTO TOTAL PROPUESTO: ${total_global:,.2f}")
     c.setFillColorRGB(0, 0, 0)
     y -= 30
+
+    # Monto total en letras
+    try:
+        monto_letras = number_to_words_es(total_global)
+        c.setFont("Helvetica", 10)
+        c.drawString(40, y, f"({monto_letras})")
+        y -= 20
+    except Exception:
+        pass
 
     # Descripciones detalladas de cada producto cotizado
     c.setFont("Helvetica-Bold", 12)

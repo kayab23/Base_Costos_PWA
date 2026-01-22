@@ -133,4 +133,16 @@ def get_listas_precios(
             r["dta_pct"] = None
             r["honorarios_aduanales_pct"] = None
             r["landed_cost_mxn"] = None
+    # Map legacy field names to new "lista" names for compatibility
+    for r in resultados:
+        # precio_maximo_lista is the new name for precio_maximo
+        try:
+            r['precio_maximo_lista'] = r.get('precio_maximo') if r.get('precio_maximo') is not None else None
+        except Exception:
+            r['precio_maximo_lista'] = None
+        # precio_minimo_lista maps to precio_vendedor_min (seller minimum)
+        try:
+            r['precio_minimo_lista'] = r.get('precio_vendedor_min') if r.get('precio_vendedor_min') is not None else None
+        except Exception:
+            r['precio_minimo_lista'] = None
     return resultados

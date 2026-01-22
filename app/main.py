@@ -9,24 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 import threading
-from fastapi import Response
-from .db import connection_scope
-
-from fastapi import FastAPI
-from slowapi import _rate_limit_exceeded_handler
-from app.limiter import limiter
-from slowapi.errors import RateLimitExceeded
-from fastapi.middleware.cors import CORSMiddleware
-
-from .config import settings
-from .routes import catalog, pricing, auth, autorizaciones, pdf
-from .logger import logger
-
-from datetime import datetime, timezone
-import threading
-from fastapi import Response
-from .db import connection_scope
-from fastapi import FastAPI
+from fastapi import Response, FastAPI
 from slowapi import _rate_limit_exceeded_handler
 from app.limiter import limiter
 from slowapi.errors import RateLimitExceeded
@@ -34,6 +17,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .routes import catalog, pricing, auth, autorizaciones, pdf
 from .logger import logger
+from .db import connection_scope
 
 # Inicializar aplicación FastAPI con configuración desde settings
 app = FastAPI(title=settings.api_title, version=settings.api_version)
@@ -49,14 +33,14 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
-# Registrar routers de cada módulo funcional (sin duplicados)
+# Registrar routers de cada módulo funcional
 app.include_router(auth.router)
 app.include_router(catalog.router)
 app.include_router(pricing.router)
 app.include_router(autorizaciones.router)
 app.include_router(pdf.router)
 
-# Variables para métricas simples
+# Variables para métricas simples (única definición)
 start_time = datetime.now(timezone.utc)
 metrics = {
     'requests_total': 0,
@@ -64,15 +48,6 @@ metrics = {
     'last_error': '',
 }
 metrics_lock = threading.Lock()
-
-# Variables globales para métricas simples
-start_time = datetime.now(timezone.utc)  # Marca de inicio de la app
-metrics = {
-    'requests_total': 0,  # Total de peticiones HTTP
-    'errors_total': 0,    # Total de errores
-    'last_error': '',     # Último error registrado
-}
-metrics_lock = threading.Lock()  # Lock para acceso concurrente seguro
 
 
 @app.get("/health")
@@ -108,12 +83,14 @@ def healthcheck():
 
 
 
-# Middleware para contar peticiones y errores y loguear headers y auth
 @app.middleware("http")
 async def debug_and_metrics_middleware(request, call_next):
+    """
+    Middleware que cuenta peticiones, errores y loguea headers sensibles.
+    Incrementa el contador de peticiones y errores, y registra headers de autenticación.
+    """
     with metrics_lock:
         metrics['requests_total'] += 1
-    # Log headers y path
     logger.warning(f"[DEBUG-MIDDLEWARE] path={request.url.path} headers={{'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}}")
     try:
         response = await call_next(request)
@@ -127,66 +104,9 @@ async def debug_and_metrics_middleware(request, call_next):
 
 @app.get("/metrics")
 def metrics_endpoint():
-    """Endpoint Prometheus-like para métricas básicas."""
-    with metrics_lock:
-        lines = [
-            f"requests_total {metrics['requests_total']}",
-            f"errors_total {metrics['errors_total']}",
-            f"uptime_seconds {(datetime.now(timezone.utc) - start_time).total_seconds():.0f}",
-        ]
-        if metrics['last_error']:
-            import logging
-            db_status = "ok"
-            db_error = None
-            logging.warning(f"[DEBUG-HEALTH] Iniciando healthcheck. Cadena de conexión: {settings.sqlserver_conn}")
+    """Endpoint Prometheus-like para métricas básicas.
 
-            try:
-                with connection_scope() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute("SELECT 1")
-                    cursor.fetchone()
-                    logging.warning("[DEBUG-HEALTH] Conexión a BD exitosa.")
-            except Exception as e:
-                db_status = "error"
-                db_error = str(e)
-                logging.error(f"[DEBUG-HEALTH] Error de conexión a BD: {db_error}")
-
-            return {
-                "status": "ok" if db_status == "ok" else "degraded",
-                "db_status": db_status,
-                "db_error": db_error,
-                "uptime_seconds": (datetime.now(timezone.utc) - start_time).total_seconds(),
-                "default_transporte": settings.default_transporte,
-                "default_monedas": settings.default_monedas,
-            }
-# Middleware para métricas y debug de headers/auth
-@app.middleware("http")
-async def debug_and_metrics_middleware(request, call_next):
-    """
-    Middleware que cuenta peticiones, errores y loguea headers sensibles.
-    Incrementa el contador de peticiones y errores, y registra headers de autenticación.
-    """
-    with metrics_lock:
-        metrics['requests_total'] += 1  # Suma una petición
-    # Loguea path y headers de autenticación/cookie
-    logger.warning(f"[DEBUG-MIDDLEWARE] path={request.url.path} headers={{'authorization': request.headers.get('authorization', None), 'cookie': request.headers.get('cookie', None)}}")
-    try:
-        response = await call_next(request)  # Llama al siguiente handler
-        return response
-    except Exception as e:
-        with metrics_lock:
-            metrics['errors_total'] += 1  # Suma un error
-            metrics['last_error'] = str(e)  # Guarda el último error
-        raise  # Propaga el error
-
-
-@app.get("/metrics")
-def metrics_endpoint():
-    """
-    Endpoint Prometheus-like para métricas básicas de la app.
-    Retorna el total de peticiones, errores, uptime y último error.
-    Returns:
-        Response: Texto plano con métricas para Prometheus.
+    Devuelve texto plano con métricas para que Prometheus las pueda scrapear.
     """
     with metrics_lock:
         lines = [
@@ -195,5 +115,6 @@ def metrics_endpoint():
             f"uptime_seconds {(datetime.now(timezone.utc) - start_time).total_seconds():.0f}",
         ]
         if metrics['last_error']:
-            lines.append(f"last_error \"{metrics['last_error']}\"")
+            # Añadir como métrica de texto para debugging
+            lines.append(f'last_error "{metrics["last_error"]}"')
     return Response("\n".join(lines), media_type="text/plain")
