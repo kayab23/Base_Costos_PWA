@@ -67,6 +67,16 @@ const state = {
     landedData: [], // Almacenar últimos resultados para descarga
 };
 
+// Mapeo de descuento máximo permitido por rol (en %)
+const allowedDiscountByRole = {
+    'Vendedor': 20,
+    'Gerencia_Comercial': 25,
+    'Subdireccion': 30,
+    'Direccion': 35,
+    'Gerencia': 40,
+    'Admin': 100
+};
+
 const selectors = {
     apiUrl: document.getElementById('api-url'),
     username: document.getElementById('username'),
@@ -591,6 +601,7 @@ function renderPriceRow(row) {
         <td class="price-col">${formatCurrency(precioMax)}</td>
         <td class="price-col">
             <input type="text" class="monto-propuesto-input" id="${montoPropuestoId}" value="${montoPropuesto}" style="width:100px;" autocomplete="off" placeholder="Escribe monto">
+            <div class="row-warning" id="warning-${row.sku}" style="display:none;"></div>
         </td>
         <td class="price-col">${formatCurrency(precioMin)}</td>
         <td class="price-col">${formatCurrency(precioMax * row.cantidad)}</td>
@@ -700,8 +711,11 @@ document.addEventListener('input', function(e) {
             if (montoNum > 0 && precioMax) {
                 const pct = Math.max(0, (precioMax - montoNum) / precioMax) * 100;
                 descuentoCell.textContent = pct.toFixed(2) + '%';
+                    // Validar autorización según rol y bloquear si excede
+                    checkDiscountAuthorization(row, sku, pct);
             } else {
                 descuentoCell.textContent = '-';
+                    checkDiscountAuthorization(row, sku, 0);
             }
         }
     }
@@ -732,12 +746,72 @@ document.addEventListener('input', function(e) {
             if (monto > 0 && precioMaxQty) {
                 const pct = Math.max(0, (precioMaxQty - monto) / precioMaxQty) * 100;
                 descuentoCellQty.textContent = pct.toFixed(2) + '%';
+                    checkDiscountAuthorization(row, sku, pct);
             } else {
                 descuentoCellQty.textContent = '-';
+                    checkDiscountAuthorization(row, sku, 0);
             }
         }
     }
 });
+
+    // Verifica si el descuento solicitado excede el permitido por el rol
+    function checkDiscountAuthorization(row, sku, pct) {
+        const role = state.userRole || 'Vendedor';
+        const allowed = allowedDiscountByRole[role] ?? 0;
+        const warningEl = document.getElementById(`warning-${sku}`);
+        const pdfBtn = document.getElementById('pdf-cotizar-btn-global');
+        if (!warningEl || !pdfBtn) return;
+
+        if (pct > allowed) {
+                // Mostrar modal de advertencia visual
+                const modal = document.getElementById('discount-modal');
+                const modalBody = document.getElementById('modal-body');
+                const modalTitle = document.getElementById('modal-title');
+                if (modal && modalBody && modalTitle) {
+                    modalTitle.textContent = `Descuento no autorizado`;
+                    modalBody.innerHTML = `El descuento solicitado de <strong>${pct.toFixed(2)}%</strong> supera tu límite autorizado de <strong>${allowed}%</strong> para el rol <strong>${role}</strong>.<br>Si necesitas continuar, solicita autorización.`;
+                    modal.style.display = 'flex';
+                }
+                // Resaltar la fila
+                const input = document.getElementById(`monto-propuesto-${sku}`);
+                if (input) input.classList.add('invalid-input');
+                // Bloquear botón global para avanzar
+                pdfBtn.disabled = true;
+                pdfBtn.classList.add('disabled');
+                showToast(`Descuento ${pct.toFixed(2)}% supera tu límite de ${allowed}%. Debes solicitar autorización.`, 'error', 5000);
+        } else {
+            // Quitar advertencia
+            warningEl.style.display = 'none';
+            warningEl.innerHTML = '';
+            const input = document.getElementById(`monto-propuesto-${sku}`);
+            if (input) input.classList.remove('invalid-input');
+            // Habilitar botón solo si no hay otras advertencias activas
+            const anyWarnings = document.querySelectorAll('.row-warning').length && Array.from(document.querySelectorAll('.row-warning')).some(w => w.style.display === 'block');
+            if (!anyWarnings) {
+                pdfBtn.disabled = false;
+                pdfBtn.classList.remove('disabled');
+            }
+        }
+    }
+
+    // Manejar click rápido en 'Solicitar autorización' dentro de la fila
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('request-auth')) {
+            const sku = e.target.getAttribute('data-sku');
+            // Abrir sección de solicitud y pre-llenar SKU y monto
+            const solSection = document.getElementById('solicitar-autorizacion-section');
+            if (solSection) solSection.style.display = 'block';
+            const solSku = document.getElementById('sol-sku');
+            const solPrecio = document.getElementById('sol-precio');
+            const montoInput = document.getElementById(`monto-propuesto-${sku}`);
+            if (solSku) solSku.value = sku;
+            if (solPrecio && montoInput) solPrecio.value = montoInput.value;
+            // Scroll to solicitar section
+            solSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            showToast('Formulario de solicitud abierto. Completa la justificación y envía.', 'info');
+        }
+    });
 
 // ...evento duplicado eliminado...
 
@@ -825,6 +899,38 @@ async function loadPendientes() {
     } catch (error) {
         console.error('Error cargando pendientes:', error);
     }
+}
+
+// Modal handlers
+document.getElementById('modal-close')?.addEventListener('click', () => {
+    const modal = document.getElementById('discount-modal');
+    if (modal) modal.style.display = 'none';
+});
+document.getElementById('modal-cancel')?.addEventListener('click', () => {
+    const modal = document.getElementById('discount-modal');
+    if (modal) modal.style.display = 'none';
+});
+document.getElementById('modal-request-auth')?.addEventListener('click', () => {
+    const modal = document.getElementById('discount-modal');
+    if (modal) modal.style.display = 'none';
+    // Abrir sección de solicitud y pre-llenar con el último SKU que causó la advertencia
+    const sku = document.querySelector('.invalid-input')?.id?.replace('monto-propuesto-', '');
+    const solSection = document.getElementById('solicitar-autorizacion-section');
+    if (solSection) solSection.style.display = 'block';
+    const solSku = document.getElementById('sol-sku');
+    const solPrecio = document.getElementById('sol-precio');
+    const montoInput = sku ? document.getElementById(`monto-propuesto-${sku}`) : null;
+    if (sku && solSku) solSku.value = sku;
+    if (solPrecio && montoInput) solPrecio.value = montoInput.value;
+    solSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    showToast('Formulario de solicitud abierto. Completa la justificación y envía.', 'info');
+});
+
+// Exponer función para pruebas automatizadas (Playwright)
+try {
+    window.checkDiscountAuthorization = checkDiscountAuthorization;
+} catch (e) {
+    // noop in non-browser contexts
 }
 
 // Cargar mis solicitudes

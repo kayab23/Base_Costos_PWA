@@ -245,5 +245,18 @@
     </main>
 
     <script src="app.js" type="module"></script>
+    <!-- Modal para solicitud de descuento adicional -->
+    <div id="discount-modal" class="modal" style="display:none;">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <button class="modal-close" id="modal-close">×</button>
+            <h3 id="modal-title">Descuento no autorizado</h3>
+            <p id="modal-body">El descuento solicitado excede tu límite autorizado.</p>
+            <div style="display:flex; gap:0.5rem; margin-top:1rem; justify-content:flex-end;">
+                <button class="ghost" id="modal-cancel">Cancelar</button>
+                <button class="primary" id="modal-request-auth">Solicitar autorización</button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
