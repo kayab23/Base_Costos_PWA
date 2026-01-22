@@ -67,6 +67,10 @@ const state = {
     landedData: [], // Almacenar últimos resultados para descarga
 };
 
+// Timers para debounce por SKU cuando se escribe el monto propuesto
+const debounceTimers = {};
+// Pending authorization request context
+let pendingAuthRequest = null;
 // Mapeo de descuento máximo permitido por rol (en %)
 const allowedDiscountByRole = {
     'Vendedor': 20,
@@ -236,6 +240,18 @@ async function loadProductos() {
 // --- FIN DEBUG ---
 
 async function loadLanded() {
+    // Validar que el campo Cliente esté lleno antes de consultar
+    const clienteValCheck = (document.getElementById('input-cliente')?.value || '').trim();
+    if (!clienteValCheck) {
+        showToast('Ingrese el nombre del Cliente antes de consultar SKUs.', 'error');
+        const cli = document.getElementById('input-cliente');
+        if (cli) {
+            cli.focus();
+            cli.classList.add('invalid-input');
+            setTimeout(() => cli.classList.remove('invalid-input'), 1500);
+        }
+        return;
+    }
     try {
         const rows = document.querySelectorAll('.sku-input-row');
         const skuQueries = Array.from(rows)
@@ -618,8 +634,18 @@ function renderPriceRow(row) {
 // Evento para generar y descargar PDF de cotización (multi-SKU)
 document.addEventListener('click', async function(e) {
     if (e.target.classList.contains('pdf-cotizar-btn')) {
-        // Leer el valor del campo cliente
-        state.cliente = document.getElementById('input-cliente')?.value || '';
+        // Leer el valor del campo cliente y validarlo
+        state.cliente = (document.getElementById('input-cliente')?.value || '').trim();
+        if (!state.cliente) {
+            showToast('El campo Cliente es obligatorio antes de generar la cotización.', 'error');
+            const cliInput = document.getElementById('input-cliente');
+            if (cliInput) {
+                cliInput.focus();
+                cliInput.classList.add('invalid-input');
+                setTimeout(() => cliInput.classList.remove('invalid-input'), 2000);
+            }
+            return;
+        }
 
         // Tomar todos los SKUs cotizados actualmente
         const rows = (state.rowsCotizacion || []);
@@ -707,16 +733,16 @@ document.addEventListener('input', function(e) {
         const precioMax = row.precio_maximo_lista ?? row.precio_maximo;
         const totalIva = Math.round(montoNum * cantidad * 0.16);
         if (ivaCell) ivaCell.textContent = formatCurrency(totalIva);
-        if (descuentoCell) {
-            if (montoNum > 0 && precioMax) {
-                const pct = Math.max(0, (precioMax - montoNum) / precioMax) * 100;
-                descuentoCell.textContent = pct.toFixed(2) + '%';
-                    // Validar autorización según rol y bloquear si excede
-                    checkDiscountAuthorization(row, sku, pct);
-            } else {
-                descuentoCell.textContent = '-';
-                    checkDiscountAuthorization(row, sku, 0);
-            }
+            if (descuentoCell) {
+                if (montoNum > 0 && precioMax) {
+                    const pct = Math.max(0, (precioMax - montoNum) / precioMax) * 100;
+                    descuentoCell.textContent = pct.toFixed(2) + '%';
+                    // Validar autorización según rol pero con debounce para evitar disparos prematuros
+                    scheduleCheckDiscount(row, sku, pct);
+                } else {
+                    descuentoCell.textContent = '-';
+                    scheduleCheckDiscount(row, sku, 0);
+                }
         }
     }
     // Actualizar Total Negociado si cambia la cantidad
@@ -746,14 +772,53 @@ document.addEventListener('input', function(e) {
             if (monto > 0 && precioMaxQty) {
                 const pct = Math.max(0, (precioMaxQty - monto) / precioMaxQty) * 100;
                 descuentoCellQty.textContent = pct.toFixed(2) + '%';
-                    checkDiscountAuthorization(row, sku, pct);
+                // Cuando cambia la cantidad, usar debounce más amplio para esperar interacciones del usuario
+                scheduleCheckDiscount(row, sku, pct, 900);
             } else {
                 descuentoCellQty.textContent = '-';
-                    checkDiscountAuthorization(row, sku, 0);
+                scheduleCheckDiscount(row, sku, 0, 900);
             }
         }
     }
 });
+
+// Programar validación con debounce para evitar advertencias al teclear
+function scheduleCheckDiscount(row, sku, pct, delay = 600) {
+    try {
+        if (debounceTimers[sku]) clearTimeout(debounceTimers[sku]);
+        // Esperar `delay` ms después del último carácter
+        debounceTimers[sku] = setTimeout(() => {
+            checkDiscountAuthorization(row, sku, pct);
+            delete debounceTimers[sku];
+        }, delay);
+    } catch (e) {
+        console.error('scheduleCheckDiscount error', e);
+    }
+}
+
+// Validar inmediatamente cuando el usuario sale del campo (blur)
+document.addEventListener('blur', function(e) {
+    if (e.target && e.target.classList && e.target.classList.contains('monto-propuesto-input')) {
+        const input = e.target;
+        const sku = input.id.replace('monto-propuesto-', '');
+        const row = (state.rowsCotizacion || []).find(r => r.sku === sku);
+        if (!row) return;
+        // cancelar debounce pendiente y validar ahora
+        if (debounceTimers[sku]) {
+            clearTimeout(debounceTimers[sku]);
+            delete debounceTimers[sku];
+        }
+        let monto = input.value.replace(',', '.');
+        let montoNum = parseFloat(monto);
+        if (isNaN(montoNum)) montoNum = 0;
+        const precioMax = row.precio_maximo_lista ?? row.precio_maximo;
+        let pct = 0;
+        if (montoNum > 0 && precioMax) {
+            pct = Math.max(0, (precioMax - montoNum) / precioMax) * 100;
+        }
+        checkDiscountAuthorization(row, sku, pct);
+    }
+}, true);
 
     // Verifica si el descuento solicitado excede el permitido por el rol
     function checkDiscountAuthorization(row, sku, pct) {
@@ -764,33 +829,44 @@ document.addEventListener('input', function(e) {
         if (!warningEl || !pdfBtn) return;
 
         if (pct > allowed) {
-                // Mostrar modal de advertencia visual
-                const modal = document.getElementById('discount-modal');
-                const modalBody = document.getElementById('modal-body');
-                const modalTitle = document.getElementById('modal-title');
-                if (modal && modalBody && modalTitle) {
-                    modalTitle.textContent = `Descuento no autorizado`;
-                    modalBody.innerHTML = `El descuento solicitado de <strong>${pct.toFixed(2)}%</strong> supera tu límite autorizado de <strong>${allowed}%</strong> para el rol <strong>${role}</strong>.<br>Si necesitas continuar, solicita autorización.`;
-                    modal.style.display = 'flex';
-                }
-                // Resaltar la fila
-                const input = document.getElementById(`monto-propuesto-${sku}`);
-                if (input) input.classList.add('invalid-input');
-                // Bloquear botón global para avanzar
-                pdfBtn.disabled = true;
-                pdfBtn.classList.add('disabled');
-                showToast(`Descuento ${pct.toFixed(2)}% supera tu límite de ${allowed}%. Debes solicitar autorización.`, 'error', 5000);
+                    // Guardar contexto de solicitud pendiente
+                    pendingAuthRequest = { sku, row, pct: Number(pct), allowed: Number(allowed), role };
+                    // Mostrar modal de advertencia visual
+                    const modal = document.getElementById('discount-modal');
+                    const modalBody = document.getElementById('modal-body');
+                    const modalTitle = document.getElementById('modal-title');
+                    if (modal && modalBody && modalTitle) {
+                        modalTitle.textContent = `Descuento no autorizado`;
+                        modalBody.innerHTML = `El descuento solicitado de <strong>${Number(pct).toFixed(2)}%</strong> supera tu límite autorizado de <strong>${Number(allowed)}%</strong> para el rol <strong>${role}</strong>.<br>Si necesitas continuar, solicita autorización.`;
+                        modal.style.display = 'flex';
+                    }
+                    // Resaltar la fila
+                    const input = document.getElementById(`monto-propuesto-${sku}`);
+                    if (input) input.classList.add('invalid-input');
+                    // Mostrar advertencia inline en la fila
+                    if (warningEl) {
+                        warningEl.style.display = 'block';
+                        warningEl.innerHTML = `Descuento ${Number(pct).toFixed(2)}% &gt; ${Number(allowed)}% (Tu rol: ${role})`;
+                    }
+                    // Bloquear botón global para avanzar
+                    pdfBtn.disabled = true;
+                    pdfBtn.classList.add('disabled');
+                    showToast(`Descuento ${Number(pct).toFixed(2)}% supera tu límite de ${Number(allowed)}%. Debes solicitar autorización.`, 'error', 5000);
         } else {
             // Quitar advertencia
-            warningEl.style.display = 'none';
-            warningEl.innerHTML = '';
+                if (warningEl) {
+                    warningEl.style.display = 'none';
+                    warningEl.innerHTML = '';
+                }
             const input = document.getElementById(`monto-propuesto-${sku}`);
             if (input) input.classList.remove('invalid-input');
             // Habilitar botón solo si no hay otras advertencias activas
-            const anyWarnings = document.querySelectorAll('.row-warning').length && Array.from(document.querySelectorAll('.row-warning')).some(w => w.style.display === 'block');
+                const anyWarnings = document.querySelectorAll('.row-warning').length && Array.from(document.querySelectorAll('.row-warning')).some(w => w.style.display === 'block');
             if (!anyWarnings) {
                 pdfBtn.disabled = false;
                 pdfBtn.classList.remove('disabled');
+                    // Limpiar contexto pendiente si aplica
+                    if (pendingAuthRequest && pendingAuthRequest.sku === sku) pendingAuthRequest = null;
             }
         }
     }
@@ -914,15 +990,32 @@ document.getElementById('modal-request-auth')?.addEventListener('click', () => {
     const modal = document.getElementById('discount-modal');
     if (modal) modal.style.display = 'none';
     // Abrir sección de solicitud y pre-llenar con el último SKU que causó la advertencia
-    const sku = document.querySelector('.invalid-input')?.id?.replace('monto-propuesto-', '');
     const solSection = document.getElementById('solicitar-autorizacion-section');
     if (solSection) solSection.style.display = 'block';
     const solSku = document.getElementById('sol-sku');
     const solPrecio = document.getElementById('sol-precio');
-    const montoInput = sku ? document.getElementById(`monto-propuesto-${sku}`) : null;
-    if (sku && solSku) solSku.value = sku;
-    if (solPrecio && montoInput) solPrecio.value = montoInput.value;
+    const solCantidad = document.getElementById('sol-cantidad');
+    const solCliente = document.getElementById('sol-cliente');
+    // Preferir usar el contexto pendiente si existe
+    if (pendingAuthRequest) {
+        const ctx = pendingAuthRequest;
+        if (solSku) solSku.value = ctx.sku || '';
+        const montoInput = ctx.sku ? document.getElementById(`monto-propuesto-${ctx.sku}`) : null;
+        if (solPrecio && montoInput) solPrecio.value = montoInput.value || '';
+        if (solCantidad) solCantidad.value = (ctx.row && ctx.row.cantidad) ? ctx.row.cantidad : 1;
+        if (solCliente) solCliente.value = document.getElementById('input-cliente')?.value || '';
+    } else {
+        const sku = document.querySelector('.invalid-input')?.id?.replace('monto-propuesto-', '');
+        const montoInput = sku ? document.getElementById(`monto-propuesto-${sku}`) : null;
+        if (sku && solSku) solSku.value = sku;
+        if (solPrecio && montoInput) solPrecio.value = montoInput.value || '';
+        if (solCantidad) solCantidad.value = 1;
+        if (solCliente) solCliente.value = document.getElementById('input-cliente')?.value || '';
+    }
     solSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Poner foco en justificación para agilizar envío
+    const just = document.getElementById('sol-justificacion');
+    if (just) just.focus();
     showToast('Formulario de solicitud abierto. Completa la justificación y envía.', 'info');
 });
 
@@ -1070,6 +1163,17 @@ document.addEventListener('click', function(e) {
     // (El manejo de los botones stepper se realiza solo en attachStepperEvents para evitar doble incremento)
     // Botón agregar SKU
     if (e.target.classList.contains('add-sku')) {
+        const clienteVal = (document.getElementById('input-cliente')?.value || '').trim();
+        if (!clienteVal) {
+            showToast('Ingrese el nombre del Cliente antes de agregar SKUs.', 'error');
+            const cli = document.getElementById('input-cliente');
+            if (cli) {
+                cli.focus();
+                cli.classList.add('invalid-input');
+                setTimeout(() => cli.classList.remove('invalid-input'), 1500);
+            }
+            return;
+        }
         addSkuInput();
         setTimeout(loadLanded, 100);
     }
