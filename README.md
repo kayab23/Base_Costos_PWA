@@ -51,6 +51,51 @@ Componentes:
 - Corrección de bug: ahora proveedor y origen aparecen siempre en el PDF.
 - Documentación y checklist actualizados.
 
+## Política de Descuentos y Flujo de Autorización (2026-01-22)
+
+- Para controlar riesgos comerciales, el sistema aplica límites de descuento según el rol del usuario. Si el `MONTO TOTAL PROPUESTO` excede el porcentaje permitido para el rol, el frontend mostrará una advertencia y bloqueará la generación del PDF hasta que se solicite y obtenga autorización.
+- Roles y límites (ejemplo): `vendedor`: 5%, `supervisor`: 15%, `admin`: 100% (sin límite). Estos valores pueden cambiar en la configuración del backend.
+- La validación se aplica tanto en frontend (UX) como en backend (`POST /cotizacion/pdf`) — el backend devuelve `403` y un mensaje cuando la solicitud excede el permiso del usuario.
+
+## Cómo ejecutar tests y validar localmente
+
+1. Crear/activar entorno virtual con Python 3.11+ y luego instalar dependencias:
+
+```bash
+C:/Users/FernandoOlveraRendon/Documents/Base_Costos/.venv/Scripts/python.exe -m pip install -r requirements.txt
+```
+
+2. Iniciar backend (ejemplo):
+
+```bash
+C:/Users/FernandoOlveraRendon/Documents/Base_Costos/.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+3. Iniciar servidor estático para frontend:
+
+```bash
+cd frontend
+python -m http.server 5173
+```
+
+4. Ejecutar tests unitarios:
+
+```bash
+C:/Users/FernandoOlveraRendon/Documents/Base_Costos/.venv/Scripts/python.exe -m pytest -q
+```
+
+5. Ejecutar E2E Playwright (si está instalado y configurado):
+
+```bash
+pytest -q tests/test_e2e_discount.py
+```
+
+6. Validar generación de PDFs (script de validación incluido):
+
+```bash
+C:/Users/FernandoOlveraRendon/Documents/Base_Costos/.venv/Scripts/python.exe scripts/validate_pdf.py
+```
+
 ## Uso Rápido
 
 **1. Calcular Landed Costs:**
