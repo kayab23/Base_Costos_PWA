@@ -5,6 +5,8 @@ Rutas para generación y descarga de PDFs de política de entrega y datos bancar
 
 from fastapi import APIRouter, Response, status, Depends, HTTPException
 from app.pdf.generar_pdf import generar_pdf_politica_entrega
+from app.db import connection_scope
+import json
 from app.auth import get_current_user
 import os
 import io
@@ -26,13 +28,44 @@ def generar_pdf_vendedor_endpoint(payload: CotizacionVendedorPDF, user=Depends(g
     cliente_codigo = datos.get('cliente_codigo') or datos.get('cliente')
     vendedor_username = datos.get('vendedor_username') or (user.get('username') if isinstance(user, dict) else None)
     seqs = get_next_quote_numbers(cliente_codigo, vendedor_username)
-    # Attach sequence numbers and fecha to datos
+    # Format numbers as C1001/00012 (5-digit zero padded) for traceability
     if seqs.get('cliente_num'):
-        datos['numero_cotizacion_cliente'] = f"{cliente_codigo}-{seqs.get('cliente_num')}"
+        try:
+            datos['numero_cotizacion_cliente'] = f"{cliente_codigo}-{int(seqs.get('cliente_num')):05d}"
+        except Exception:
+            datos['numero_cotizacion_cliente'] = f"{cliente_codigo}-{seqs.get('cliente_num')}"
     if seqs.get('vendedor_num'):
-        datos['numero_cotizacion_vendedor'] = f"{vendedor_username}-{seqs.get('vendedor_num')}"
+        try:
+            datos['numero_cotizacion_vendedor'] = f"{vendedor_username}-{int(seqs.get('vendedor_num')):05d}"
+        except Exception:
+            datos['numero_cotizacion_vendedor'] = f"{vendedor_username}-{seqs.get('vendedor_num')}"
     from datetime import datetime
-    datos['fecha_cotizacion'] = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+    fecha_dt = datetime.utcnow()
+    datos['fecha_cotizacion'] = fecha_dt.strftime('%Y-%m-%d %H:%M UTC')
+    # Persist a record in cotizaciones for auditing/search
+    try:
+        payload_json = json.dumps(datos, default=str, ensure_ascii=False)
+        with connection_scope() as conn:
+            cur = conn.cursor()
+            logging.info('Inserting cotizacion record: cliente=%s vendedor=%s numero_cliente=%s numero_vendedor=%s', datos.get('cliente'), vendedor_username, datos.get('numero_cotizacion_cliente'), datos.get('numero_cotizacion_vendedor'))
+            cur.execute(
+                "INSERT INTO dbo.cotizaciones (cliente, vendedor, numero_cliente, numero_vendedor, fecha_cotizacion, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, GETDATE())",
+                (
+                    datos.get('cliente'),
+                    vendedor_username,
+                    datos.get('numero_cotizacion_cliente'),
+                    datos.get('numero_cotizacion_vendedor'),
+                    fecha_dt,
+                    payload_json,
+                ),
+            )
+            logging.info('Cotizacion insert executed, committing')
+            conn.commit()
+            logging.info('Cotizacion committed')
+    except Exception:
+        # Non-fatal: if insert fails, continue PDF generation but log the issue
+        import logging
+        logging.exception('Failed to persist cotizacion record')
     # Validación de descuentos según rol del solicitante (por seguridad)
     allowed_discount_by_role = {
         'Vendedor': 20,

@@ -45,4 +45,14 @@ Tablas eliminadas/no usadas: Versiones, CostosBase, PoliticasMargen, ControlVers
 
 ---
 
-**Última actualización:** 19/01/2026
+## 7. Cambios recientes (2026-01-23)
+
+- Revisión y mejora del generador de PDFs de cotización:
+  - Encabezado con logo en esquina superior derecha y título alineado a la izquierda.
+  - Tabla adaptativa al ancho de página, encabezados abreviados y valores alineados.
+  - Control de saltos de página y protección del bloque de totales y detalles.
+- Auditoría de cotizaciones: persistencia en `dbo.cotizaciones` con `fecha_cotizacion`, `numero_cliente` y `numero_vendedor`.
+- Nuevos endpoints para autocompletar clientes y vendedores, y endpoint `/api/cotizaciones` para listar cotizaciones.
+- Scripts de prueba usados y luego limpiados del control de versiones cuando eran temporales.
+
+**Última actualización:** 23/01/2026

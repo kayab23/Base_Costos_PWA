@@ -1288,6 +1288,67 @@ if (state.auth) {
     loadProductos();
 }
 
+// --- Cotizaciones: fetch and render recent/search results ---
+async function fetchCotizaciones(q = '', limit = 20) {
+    try {
+        const params = new URLSearchParams();
+        if (q) params.append('q', q);
+        params.append('limit', String(limit));
+        const data = await apiFetch(`/cotizaciones?${params.toString()}`);
+        return data;
+    } catch (e) {
+        console.error('Error fetching cotizaciones', e);
+        showToast('No se pudieron obtener cotizaciones: ' + e.message, 'error');
+        return [];
+    }
+}
+
+function renderCotizaciones(list) {
+    let section = document.getElementById('cotizaciones-section');
+    if (!section) {
+        section = document.createElement('section');
+        section.id = 'cotizaciones-section';
+        section.className = 'card';
+        section.innerHTML = `
+            <h3>Cotizaciones Recientes</h3>
+            <div style="margin-bottom:8px;"><input id="cotizaciones-q" placeholder="Buscar por cliente o número" style="width:240px;margin-right:8px;"> <button id="refresh-cotizaciones">Actualizar</button></div>
+            <div style="overflow:auto; max-height:240px;"><table id="cotizaciones-table" class="simple-table"><thead><tr><th>ID</th><th>Cliente</th><th>Vendedor</th><th>N° Cliente</th><th>N° Vendedor</th><th>Fecha</th></tr></thead><tbody></tbody></table></div>
+        `;
+        // insert after product details card if present, else append to body
+        const anchor = document.getElementById('product-details-card') || document.querySelector('.login-card');
+        if (anchor && anchor.parentNode) anchor.parentNode.insertBefore(section, anchor.nextSibling);
+        else document.body.appendChild(section);
+        document.getElementById('refresh-cotizaciones')?.addEventListener('click', loadCotizaciones);
+        document.getElementById('cotizaciones-q')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') loadCotizaciones(); });
+    }
+    const tbody = section.querySelector('table#cotizaciones-table tbody');
+    tbody.innerHTML = (list || []).slice(0, 200).map(c => `
+        <tr>
+            <td>${c.id}</td>
+            <td>${c.cliente || '-'}</td>
+            <td>${c.vendedor || '-'}</td>
+            <td>${c.numero_cliente || '-'}</td>
+            <td>${c.numero_vendedor || '-'}</td>
+            <td>${c.fecha_cotizacion ? new Date(c.fecha_cotizacion).toLocaleString('es-MX') : '-'}</td>
+        </tr>
+    `).join('');
+}
+
+async function loadCotizaciones() {
+    try {
+        const q = document.getElementById('cotizaciones-q')?.value || '';
+        const rows = await fetchCotizaciones(q, 50);
+        renderCotizaciones(rows);
+    } catch (e) {
+        console.error('loadCotizaciones error', e);
+    }
+}
+
+// Try to populate cotizaciones after login if available
+document.addEventListener('DOMContentLoaded', ()=>{
+    if (state.auth) setTimeout(loadCotizaciones, 500);
+});
+
 // --- Timeout de sesión por inactividad ---
 let lastActivity = Date.now(); // Declare and initialize lastActivity
 const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutos

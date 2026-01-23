@@ -40,3 +40,15 @@
 **Siguiente paso:**
 - Mantener documentación y checklist actualizados tras cada cambio relevante.
 - Avanzar en automatización de pruebas y CI/CD.
+
+## 2026-01-23 - Mejoras de generación de PDF y auditoría
+- Reorganización completa del layout del PDF de cotización: banda de encabezado fija, logo en esquina superior derecha, título alineado a la izquierda y tabla que usa el ancho utilizable.
+- Encabezados abreviados para evitar recortes: `P. Lista`, `Monto Prop.`, `IVA 16%`, `Desc. %`.
+- Alineación y formato: valores numéricos centrados bajo sus encabezados; SKU centrado en su celda; renglón de total alineado a la izquierda.
+- Inclusión de `M/N` en el monto en letras (moneda nacional) y ajuste de tamaño de fuentes para mejorar legibilidad.
+- Implementación de control de saltos de página para evitar que los detalles o totales se corten entre páginas.
+- Añadidos endpoints y persistencia: numeración automática de cotizaciones por cliente/vendedor, almacenamiento en tabla `dbo.cotizaciones` y nuevo endpoint `/api/cotizaciones` para auditoría.
+- Endpoints de autocompletado para cliente y vendedor (`/api/clientes`, `/api/vendedores`) y cambios menores en el frontend para consumirlos.
+- Scripts de prueba usados para validar: `Scripts/request_pdf_api.py`, `Scripts/export_table_png.py` (archivos temporales generados y posteriormente eliminados).
+
+**Notas:** Los archivos temporales de prueba (`api_test_cotizacion.pdf`, `api_test_cotizacion_table_preview.png`) fueron limpiados del repositorio.

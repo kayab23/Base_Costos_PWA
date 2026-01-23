@@ -15,7 +15,7 @@ from app.limiter import limiter
 from slowapi.errors import RateLimitExceeded
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
-from .routes import catalog, pricing, auth, autorizaciones, pdf
+from .routes import catalog, pricing, auth, autorizaciones, pdf, clientes, vendedores, cotizaciones
 from .logger import logger
 from .db import connection_scope
 
@@ -39,6 +39,9 @@ app.include_router(catalog.router)
 app.include_router(pricing.router)
 app.include_router(autorizaciones.router)
 app.include_router(pdf.router)
+app.include_router(clientes.router)
+app.include_router(vendedores.router)
+app.include_router(cotizaciones.router)
 
 # Variables para métricas simples (única definición)
 start_time = datetime.now(timezone.utc)

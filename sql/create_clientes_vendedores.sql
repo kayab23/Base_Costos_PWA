@@ -37,3 +37,17 @@ CREATE TABLE cotizacion_secuencias (
 );
 CREATE INDEX idx_cotsec_cliente ON cotizacion_secuencias(cliente_codigo);
 CREATE INDEX idx_cotsec_vendedor ON cotizacion_secuencias(vendedor_username);
+
+-- Table to store generated cotizaciones for auditing and search
+CREATE TABLE cotizaciones (
+  id INT IDENTITY PRIMARY KEY,
+  cliente VARCHAR(255) NULL,
+  vendedor VARCHAR(255) NULL,
+  numero_cliente VARCHAR(100) NULL,
+  numero_vendedor VARCHAR(100) NULL,
+  fecha_cotizacion DATETIME NULL,
+  payload_json NVARCHAR(MAX) NULL,
+  created_at DATETIME DEFAULT GETDATE()
+);
+CREATE INDEX idx_cotizaciones_numcliente ON cotizaciones(numero_cliente);
+CREATE INDEX idx_cotizaciones_numvendedor ON cotizaciones(numero_vendedor);
