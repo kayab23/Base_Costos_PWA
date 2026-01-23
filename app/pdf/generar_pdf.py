@@ -59,22 +59,32 @@ def generar_pdf_politica_entrega(datos: dict) -> bytes:
     c.drawString(40, y, "Productos Cotizados:")
     y -= 18
     c.setFont("Helvetica-Bold", 10)
-    # Mostrar Precio de Lista (por unidad) y Total Máximo (precio por unidad * cantidad)
-    headers = ["SKU", "Cantidad", "Precio de Lista", "Total Máximo", "Monto Propuesto", "IVA 16%", "Descuento %", "Total"]
-    # Ajustar anchos: mantener la suma dentro del área imprimible (width - margins)
-    col_widths = [120, 50, 70, 70, 70, 50, 50, 52]
+    # Mostrar Precio de Lista (unidad) y debajo el Total Máximo en la misma celda
+    headers = ["SKU", "Cantidad", "Precio de Lista", "Monto Propuesto", "IVA 16%", "Descuento %", "Total"]
+    # Ajustar anchos para una sola columna combinada (ajustados al ancho de carta)
+    # Usable width = 612 (letter) - 40 left margin - 40 right margin = 532
+    col_widths = [110, 40, 140, 80, 60, 50, 52]
     x_start = 40
     x = x_start
     # Encabezados (texto azul, fondo blanco)
+    header_box_h = 18
+    header_font_size = 9
     for i, h in enumerate(headers):
         c.setFillColorRGB(1, 1, 1)
-        c.rect(x, y-2, col_widths[i], 16, fill=1, stroke=0)
+        c.rect(x, y-2, col_widths[i], header_box_h, fill=1, stroke=0)
         c.setFillColorRGB(0.09, 0.29, 0.55)  # Azul institucional
-        c.drawString(x+4, y, h)
+        c.setFont('Helvetica-Bold', header_font_size)
+        # Right-align numeric headers for visual alignment with column numbers
+        if i in (2, 3, 4, 5, 6):
+            right_x = x + col_widths[i] - 6
+            c.drawRightString(right_x, y, h)
+        else:
+            c.drawString(x+4, y, h)
         x += col_widths[i]
-    y -= 16
+    y -= header_box_h
     c.setFont("Helvetica", 10)
     total_global = 0
+    row_height = 18
     for item in datos.get('items', []):
         if y < 80:
             c.showPage()
@@ -108,13 +118,11 @@ def generar_pdf_politica_entrega(datos: dict) -> bytes:
         except Exception:
             descuento_pct = 0.0
 
-        # Formatear precio de lista por unidad y total
-        precio_lista_unit_fmt = f"${precio_maximo_lista:,.2f}" if precio_maximo_lista is not None else "-"
+        # Mostrar Precio de Lista: usar el valor del Total Máximo (sin mostrar '= ...')
         precio_lista_total_fmt = f"${precio_lista_total:,.2f}"
         row = [
             item.get('sku', '-'),
             str(cantidad),
-            precio_lista_unit_fmt,
             precio_lista_total_fmt,
             f"${monto_propuesto_total:,.2f}",
             f"${iva_total:,.2f}",
@@ -123,28 +131,32 @@ def generar_pdf_politica_entrega(datos: dict) -> bytes:
         ]
         for i, val in enumerate(row):
             c.setFillColorRGB(1, 1, 1)
-            c.rect(x, y-2, col_widths[i], 14, fill=1, stroke=0)
+            c.rect(x, y-4, col_widths[i], row_height, fill=1, stroke=0)
             c.setFillColorRGB(0, 0, 0)
-            # Column 0 (SKU) -> left aligned; numeric columns -> right aligned
             try:
-                # Highlight 'Total Máximo' (index 3) and 'Monto Propuesto' (index 4)
-                if i in (3, 4):
+                if i == 2:
+                    # Precio de Lista column: show Total Máximo value (right aligned, bold)
                     c.setFont('Helvetica-Bold', 10)
-                else:
-                    c.setFont('Helvetica', 10)
-                text = str(val)
-                if i == 0:
-                    c.drawString(x+4, y, text)
-                else:
-                    # right align numeric/text in column
+                    text = str(val)
                     right_x = x + col_widths[i] - 6
                     c.drawRightString(right_x, y, text)
+                else:
+                    if i == 3:
+                        c.setFont('Helvetica-Bold', 10)
+                    else:
+                        c.setFont('Helvetica', 10)
+                    text = str(val)
+                    if i == 0:
+                        c.drawString(x+4, y, text)
+                    else:
+                        right_x = x + col_widths[i] - 6
+                        c.drawRightString(right_x, y, text)
             except Exception:
                 c.setFont('Helvetica', 10)
                 c.drawString(x+4, y, str(val))
             finally:
                 x += col_widths[i]
-        y -= 14
+        y -= row_height
         # Línea divisoria
         c.setStrokeColorRGB(0.85, 0.85, 0.85)
         c.setLineWidth(0.5)
