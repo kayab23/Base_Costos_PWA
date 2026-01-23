@@ -10,6 +10,7 @@ import os
 import io
 from PyPDF2 import PdfMerger
 from app.schemas import CotizacionVendedorPDF
+from app.db.sequences import get_next_quote_numbers
 
 router = APIRouter(prefix="/cotizacion", tags=["cotizacion"])
 
@@ -21,6 +22,17 @@ def generar_pdf_vendedor_endpoint(payload: CotizacionVendedorPDF, user=Depends(g
     import logging
     logging.basicConfig(level=logging.INFO)
     datos = payload.dict()
+    # Auto-generate quote numbers for client and vendor if not provided
+    cliente_codigo = datos.get('cliente_codigo') or datos.get('cliente')
+    vendedor_username = datos.get('vendedor_username') or (user.get('username') if isinstance(user, dict) else None)
+    seqs = get_next_quote_numbers(cliente_codigo, vendedor_username)
+    # Attach sequence numbers and fecha to datos
+    if seqs.get('cliente_num'):
+        datos['numero_cotizacion_cliente'] = f"{cliente_codigo}-{seqs.get('cliente_num')}"
+    if seqs.get('vendedor_num'):
+        datos['numero_cotizacion_vendedor'] = f"{vendedor_username}-{seqs.get('vendedor_num')}"
+    from datetime import datetime
+    datos['fecha_cotizacion'] = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
     # Validación de descuentos según rol del solicitante (por seguridad)
     allowed_discount_by_role = {
         'Vendedor': 20,

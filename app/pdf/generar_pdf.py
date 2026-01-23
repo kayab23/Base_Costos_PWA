@@ -52,6 +52,22 @@ def generar_pdf_politica_entrega(datos: dict) -> bytes:
 
     c.setFont("Helvetica-Bold", 14)
     c.drawString(40, y, f"Cliente: {datos.get('cliente', '-').upper()}")
+    # Mostrar número de cotización y fecha (si existen en payload)
+    numero_cliente = datos.get('numero_cotizacion_cliente')
+    numero_vendedor = datos.get('numero_cotizacion_vendedor')
+    fecha_cot = datos.get('fecha_cotizacion')
+    if not fecha_cot:
+        from datetime import datetime
+        fecha_cot = datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
+    y -= 18
+    c.setFont('Helvetica', 9)
+    if numero_cliente or numero_vendedor:
+        num_text = ' '.join([p for p in [f"N° Cliente: {numero_cliente}" if numero_cliente else None,
+                                        f"N° Vendedor: {numero_vendedor}" if numero_vendedor else None] if p])
+        c.drawString(40, y, num_text)
+        y -= 14
+    c.drawString(40, y, f"Fecha: {fecha_cot}")
+    y += 4
     y -= 25
 
     # Tabla de SKUs cotizados con fondo blanco, encabezados azules y líneas divisorias suaves
@@ -61,25 +77,26 @@ def generar_pdf_politica_entrega(datos: dict) -> bytes:
     c.setFont("Helvetica-Bold", 10)
     # Mostrar Precio de Lista (unidad) y debajo el Total Máximo en la misma celda
     headers = ["SKU", "Cantidad", "Precio de Lista", "Monto Propuesto", "IVA 16%", "Descuento %", "Total"]
-    # Ajustar anchos para una sola columna combinada (ajustados al ancho de carta)
+    # Ajustar anchos para mejorar legibilidad y evitar que los encabezados se solapen
     # Usable width = 612 (letter) - 40 left margin - 40 right margin = 532
-    col_widths = [110, 40, 140, 80, 60, 50, 52]
+    # Aumentamos SKU y Cantidad, reducimos ligeramente Precio de Lista y movemos espacio a IVA/Descuento
+    col_widths = [120, 50, 120, 80, 50, 60, 52]
     x_start = 40
     x = x_start
     # Encabezados (texto azul, fondo blanco)
     header_box_h = 18
-    header_font_size = 9
+    header_font_size = 8
     for i, h in enumerate(headers):
         c.setFillColorRGB(1, 1, 1)
         c.rect(x, y-2, col_widths[i], header_box_h, fill=1, stroke=0)
         c.setFillColorRGB(0.09, 0.29, 0.55)  # Azul institucional
         c.setFont('Helvetica-Bold', header_font_size)
-        # Right-align numeric headers for visual alignment with column numbers
-        if i in (2, 3, 4, 5, 6):
-            right_x = x + col_widths[i] - 6
-            c.drawRightString(right_x, y, h)
-        else:
-            c.drawString(x+4, y, h)
+        # Align headers: center all headers horizontally and vertically inside header box
+        # Compute header text Y so it is vertically centered inside the header box
+        # rect is drawn at (x, y-2) with height header_box_h, so center = y-2 + header_box_h/2
+        header_text_y = (y - 2) + (header_box_h / 2) - (header_font_size / 4)
+        center_x = x + (col_widths[i] / 2)
+        c.drawCentredString(center_x, header_text_y, h)
         x += col_widths[i]
     y -= header_box_h
     c.setFont("Helvetica", 10)
@@ -118,8 +135,9 @@ def generar_pdf_politica_entrega(datos: dict) -> bytes:
         except Exception:
             descuento_pct = 0.0
 
-        # Mostrar Precio de Lista: usar el valor del Total Máximo (sin mostrar '= ...')
-        precio_lista_total_fmt = f"${precio_lista_total:,.2f}"
+        # Mostrar Precio de Lista: usar el valor del Total Máximo (redondeado a pesos)
+        precio_lista_total_rounded = round(precio_lista_total)
+        precio_lista_total_fmt = f"${precio_lista_total_rounded:,.0f}"
         row = [
             item.get('sku', '-'),
             str(cantidad),
@@ -134,26 +152,20 @@ def generar_pdf_politica_entrega(datos: dict) -> bytes:
             c.rect(x, y-4, col_widths[i], row_height, fill=1, stroke=0)
             c.setFillColorRGB(0, 0, 0)
             try:
-                if i == 2:
-                    # Precio de Lista column: show Total Máximo value (right aligned, bold)
-                    c.setFont('Helvetica-Bold', 10)
-                    text = str(val)
-                    right_x = x + col_widths[i] - 6
-                    c.drawRightString(right_x, y, text)
+                # baseline Y centered within row
+                text_y = y - (row_height / 2) + 3
+                # Use smaller font for values
+                if i == 3:
+                    c.setFont('Helvetica-Bold', 9)
                 else:
-                    if i == 3:
-                        c.setFont('Helvetica-Bold', 10)
-                    else:
-                        c.setFont('Helvetica', 10)
-                    text = str(val)
-                    if i == 0:
-                        c.drawString(x+4, y, text)
-                    else:
-                        right_x = x + col_widths[i] - 6
-                        c.drawRightString(right_x, y, text)
+                    c.setFont('Helvetica', 9)
+                text = str(val)
+                # Center all cell values horizontally
+                center_x = x + (col_widths[i] / 2)
+                c.drawCentredString(center_x, text_y, text)
             except Exception:
-                c.setFont('Helvetica', 10)
-                c.drawString(x+4, y, str(val))
+                c.setFont('Helvetica', 9)
+                c.drawString(x+6, y, str(val))
             finally:
                 x += col_widths[i]
         y -= row_height
