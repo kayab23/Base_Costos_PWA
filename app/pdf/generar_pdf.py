@@ -59,8 +59,10 @@ def generar_pdf_politica_entrega(datos: dict) -> bytes:
     c.drawString(40, y, "Productos Cotizados:")
     y -= 18
     c.setFont("Helvetica-Bold", 10)
-    headers = ["SKU", "Cantidad", "Monto Propuesto", "IVA 16%", "Descuento %", "Total"]
-    col_widths = [70, 60, 90, 70, 70, 90]
+    # Mostrar Precio de Lista (por unidad) y Total Máximo (precio por unidad * cantidad)
+    headers = ["SKU", "Cantidad", "Precio de Lista", "Total Máximo", "Monto Propuesto", "IVA 16%", "Descuento %", "Total"]
+    # Ajustar anchos: mantener la suma dentro del área imprimible (width - margins)
+    col_widths = [120, 50, 70, 70, 70, 50, 50, 52]
     x_start = 40
     x = x_start
     # Encabezados (texto azul, fondo blanco)
@@ -90,23 +92,32 @@ def generar_pdf_politica_entrega(datos: dict) -> bytes:
         else:
             precio_maximo_lista = 0.0
 
-        iva = monto_propuesto * 0.16
-        total = (monto_propuesto + iva) * cantidad
+        # Calcular montos totales considerando la cantidad
+        monto_propuesto_total = monto_propuesto * cantidad
+        iva_total = monto_propuesto_total * 0.16
+        total = monto_propuesto_total + iva_total
         total_global += total
-        # Calculate discount percentage relative to precio_maximo_lista
+
+        # Calcular descuento relativo al precio de lista total (precio por unidad * cantidad)
         try:
-            if precio_maximo_lista > 0:
-                descuento_pct = max(0.0, 100.0 * (1.0 - (monto_propuesto / precio_maximo_lista)))
+            precio_lista_total = precio_maximo_lista * cantidad if precio_maximo_lista is not None else 0.0
+            if precio_lista_total > 0:
+                descuento_pct = max(0.0, 100.0 * (1.0 - (monto_propuesto_total / precio_lista_total)))
             else:
                 descuento_pct = 0.0
         except Exception:
             descuento_pct = 0.0
 
+        # Formatear precio de lista por unidad y total
+        precio_lista_unit_fmt = f"${precio_maximo_lista:,.2f}" if precio_maximo_lista is not None else "-"
+        precio_lista_total_fmt = f"${precio_lista_total:,.2f}"
         row = [
             item.get('sku', '-'),
             str(cantidad),
-            f"${monto_propuesto:,.2f}",
-            f"${iva:,.2f}",
+            precio_lista_unit_fmt,
+            precio_lista_total_fmt,
+            f"${monto_propuesto_total:,.2f}",
+            f"${iva_total:,.2f}",
             f"{descuento_pct:.2f}%",
             f"${total:,.2f}"
         ]
@@ -114,8 +125,25 @@ def generar_pdf_politica_entrega(datos: dict) -> bytes:
             c.setFillColorRGB(1, 1, 1)
             c.rect(x, y-2, col_widths[i], 14, fill=1, stroke=0)
             c.setFillColorRGB(0, 0, 0)
-            c.drawString(x+4, y, str(val))
-            x += col_widths[i]
+            # Column 0 (SKU) -> left aligned; numeric columns -> right aligned
+            try:
+                # Highlight 'Total Máximo' (index 3) and 'Monto Propuesto' (index 4)
+                if i in (3, 4):
+                    c.setFont('Helvetica-Bold', 10)
+                else:
+                    c.setFont('Helvetica', 10)
+                text = str(val)
+                if i == 0:
+                    c.drawString(x+4, y, text)
+                else:
+                    # right align numeric/text in column
+                    right_x = x + col_widths[i] - 6
+                    c.drawRightString(right_x, y, text)
+            except Exception:
+                c.setFont('Helvetica', 10)
+                c.drawString(x+4, y, str(val))
+            finally:
+                x += col_widths[i]
         y -= 14
         # Línea divisoria
         c.setStrokeColorRGB(0.85, 0.85, 0.85)
@@ -186,6 +214,16 @@ def generar_pdf_politica_entrega(datos: dict) -> bytes:
     c.setFillColorRGB(0.5, 0.5, 0.5)
     c.drawString(40, 40, "Documento generado automáticamente por el sistema de cotización Vitaris.")
     c.setFillColorRGB(0, 0, 0)
+    # Marca de versión para identificar la plantilla usada en la generación
+    try:
+        from datetime import datetime
+        ver_text = f"Plantilla PDF: v2 — Generado: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+        c.setFont("Helvetica", 8)
+        c.setFillColorRGB(0.5, 0.5, 0.5)
+        c.drawRightString(width - 40, 28, ver_text)
+        c.setFillColorRGB(0, 0, 0)
+    except Exception:
+        pass
 
     c.showPage()
     c.save()

@@ -100,6 +100,33 @@ const selectors = {
 if (state.baseUrl) selectors.apiUrl.value = state.baseUrl;
 if (state.auth) selectors.status.textContent = 'Sesión guardada (reautenticar si es necesario).';
 
+// Inicializar UI: ocultar todas las tarjetas excepto el login al iniciar o recargar
+function initLoginOnlyView() {
+    document.querySelectorAll('.card').forEach(card => {
+        if (!card.classList.contains('login-card')) {
+            card.style.display = 'none';
+        } else {
+            card.style.display = '';
+        }
+    });
+    // Estado inicial: probar conexión al backend y mostrar 'Sin conexión' si falla
+    selectors.status.textContent = 'Comprobando conexión...';
+    (async () => {
+        try {
+            const url = (selectors.apiUrl && selectors.apiUrl.value) ? selectors.apiUrl.value.trim() : state.baseUrl;
+            const resp = await fetch(`${url}/health`, { method: 'GET' });
+            if (!resp.ok) throw new Error('no-ok');
+            // Backend responde, indicar que está disponible pero aún no autenticado
+            selectors.status.textContent = 'Conectado (autenticar)';
+        } catch (e) {
+            selectors.status.textContent = 'Sin conexión';
+        }
+    })();
+}
+
+// Ejecutar inicialización de vista al cargar el script
+initLoginOnlyView();
+
 async function apiFetch(path, options = {}) {
     if (!state.auth) {
         throw new Error('No hay sesión activa');
@@ -737,13 +764,13 @@ document.addEventListener('input', function(e) {
                 if (montoNum > 0 && precioMax) {
                     const pct = Math.max(0, (precioMax - montoNum) / precioMax) * 100;
                     descuentoCell.textContent = pct.toFixed(2) + '%';
-                    // Validar autorización según rol pero con debounce para evitar disparos prematuros
-                    scheduleCheckDiscount(row, sku, pct);
+                    // Validar autorización según rol pero con debounce más amplio para evitar advertencias tempranas
+                    scheduleCheckDiscount(row, sku, pct, 1200);
                 } else {
                     descuentoCell.textContent = '-';
-                    scheduleCheckDiscount(row, sku, 0);
+                    scheduleCheckDiscount(row, sku, 0, 1200);
                 }
-        }
+            }
     }
     // Actualizar Total Negociado si cambia la cantidad
     if (e.target.classList.contains('cantidad-input')) {
@@ -773,17 +800,17 @@ document.addEventListener('input', function(e) {
                 const pct = Math.max(0, (precioMaxQty - monto) / precioMaxQty) * 100;
                 descuentoCellQty.textContent = pct.toFixed(2) + '%';
                 // Cuando cambia la cantidad, usar debounce más amplio para esperar interacciones del usuario
-                scheduleCheckDiscount(row, sku, pct, 900);
+                scheduleCheckDiscount(row, sku, pct, 1200);
             } else {
                 descuentoCellQty.textContent = '-';
-                scheduleCheckDiscount(row, sku, 0, 900);
+                scheduleCheckDiscount(row, sku, 0, 1200);
             }
         }
     }
 });
 
 // Programar validación con debounce para evitar advertencias al teclear
-function scheduleCheckDiscount(row, sku, pct, delay = 600) {
+function scheduleCheckDiscount(row, sku, pct, delay = 1200) {
     try {
         if (debounceTimers[sku]) clearTimeout(debounceTimers[sku]);
         // Esperar `delay` ms después del último carácter
@@ -816,17 +843,30 @@ document.addEventListener('blur', function(e) {
         if (montoNum > 0 && precioMax) {
             pct = Math.max(0, (precioMax - montoNum) / precioMax) * 100;
         }
-        checkDiscountAuthorization(row, sku, pct);
+        // Forzar validación al perder foco
+        checkDiscountAuthorization(row, sku, pct, true);
     }
 }, true);
 
     // Verifica si el descuento solicitado excede el permitido por el rol
-    function checkDiscountAuthorization(row, sku, pct) {
+    function checkDiscountAuthorization(row, sku, pct, force = false) {
         const role = state.userRole || 'Vendedor';
         const allowed = allowedDiscountByRole[role] ?? 0;
         const warningEl = document.getElementById(`warning-${sku}`);
         const pdfBtn = document.getElementById('pdf-cotizar-btn-global');
         if (!warningEl || !pdfBtn) return;
+
+        // Evitar advertencias si el monto propuesto aún es muy corto (ej: el vendedor sigue tipeando)
+        try {
+            const inputEl = document.getElementById(`monto-propuesto-${sku}`);
+            if (inputEl && !force) {
+                const raw = (inputEl.value || '').replace(/[^0-9]/g, '');
+                // Si quedan menos de 3 dígitos numéricos, asumimos que aún está tipeando
+                if (raw.length < 3) return;
+            }
+        } catch (e) {
+            // noop
+        }
 
         if (pct > allowed) {
                     // Guardar contexto de solicitud pendiente
@@ -906,9 +946,8 @@ document.getElementById('solicitud-form')?.addEventListener('submit', async (e) 
     if (submitBtn.disabled) return;
     submitBtn.disabled = true;
     
-    const data = {
+        const data = {
         sku: document.getElementById('sol-sku').value.trim(),
-        transporte: document.getElementById('sol-transporte').value,
         precio_propuesto: parseFloat(document.getElementById('sol-precio').value),
         cliente: document.getElementById('sol-cliente').value.trim() || null,
         cantidad: parseInt(document.getElementById('sol-cantidad').value) || null,
@@ -929,6 +968,12 @@ document.getElementById('solicitud-form')?.addEventListener('submit', async (e) 
         
         // Limpiar formulario
         e.target.reset();
+        // Limpiar contexto pendiente y advertencias
+        pendingAuthRequest = null;
+        clearSolicitudForm();
+        // Ocultar sección de solicitud después de enviar
+        const solSectionHide = document.getElementById('solicitar-autorizacion-section');
+        if (solSectionHide) solSectionHide.style.display = 'none';
         
         // Recargar lista de mis solicitudes
         loadMisSolicitudes();
@@ -981,10 +1026,15 @@ async function loadPendientes() {
 document.getElementById('modal-close')?.addEventListener('click', () => {
     const modal = document.getElementById('discount-modal');
     if (modal) modal.style.display = 'none';
+    // limpiar contexto y formulario cuando se cierra sin acción
+    pendingAuthRequest = null;
+    clearSolicitudForm();
 });
 document.getElementById('modal-cancel')?.addEventListener('click', () => {
     const modal = document.getElementById('discount-modal');
     if (modal) modal.style.display = 'none';
+    pendingAuthRequest = null;
+    clearSolicitudForm();
 });
 document.getElementById('modal-request-auth')?.addEventListener('click', () => {
     const modal = document.getElementById('discount-modal');
@@ -1018,6 +1068,26 @@ document.getElementById('modal-request-auth')?.addEventListener('click', () => {
     if (just) just.focus();
     showToast('Formulario de solicitud abierto. Completa la justificación y envía.', 'info');
 });
+
+// Limpia los campos del formulario de solicitud y mensajes asociados
+function clearSolicitudForm() {
+    try {
+        const solSku = document.getElementById('sol-sku');
+        const solPrecio = document.getElementById('sol-precio');
+        const solCantidad = document.getElementById('sol-cantidad');
+        const solCliente = document.getElementById('sol-cliente');
+        const solJust = document.getElementById('sol-justificacion');
+        const statusEl = document.getElementById('solicitud-status');
+        if (solSku) solSku.value = '';
+        if (solPrecio) solPrecio.value = '';
+        if (solCantidad) solCantidad.value = '';
+        if (solCliente) solCliente.value = '';
+        if (solJust) solJust.value = '';
+        if (statusEl) statusEl.textContent = '';
+    } catch (e) {
+        // noop
+    }
+}
 
 // Exponer función para pruebas automatizadas (Playwright)
 try {
