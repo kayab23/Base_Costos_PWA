@@ -90,6 +90,8 @@ const selectors = {
     connectBtn: document.getElementById('connect-btn'),
     landedTable: document.querySelector('#landed-table tbody'),
     skuList: document.getElementById('sku-list'),
+    clienteInput: document.getElementById('input-cliente'),
+    vendedorInput: document.getElementById('input-vendedor'),
     skuInputsContainer: document.getElementById('sku-inputs-container'),
     clearSkusBtn: document.getElementById('clear-skus'),
     downloadExcelBtn: document.getElementById('download-excel'),
@@ -369,6 +371,84 @@ async function loadLanded() {
         showToast(error.message, 'error');
     }
 }
+
+// --- Autocomplete for Cliente and Vendedor (debounced) ---
+function debounce(fn, wait){ let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),wait);}; }
+
+async function fetchClientes(q){
+    if(!q) return [];
+    try{
+        // use apiFetch so it includes auth header
+        const res = await apiFetch(`/api/clientes?q=${encodeURIComponent(q)}&limit=10`);
+        return res;
+    }catch(e){
+        return [];
+    }
+}
+
+async function fetchVendedores(q){
+    if(!q) return [];
+    try{
+        const res = await apiFetch(`/api/vendedores?q=${encodeURIComponent(q)}&limit=10`);
+        return res;
+    }catch(e){
+        return [];
+    }
+}
+
+function attachAutocomplete(){
+    if(!selectors.clienteInput || !selectors.vendedorInput) return;
+    const cliDropdown = document.createElement('div');
+    cliDropdown.className = 'typeahead-dropdown';
+    selectors.clienteInput.parentNode.appendChild(cliDropdown);
+    const vendDropdown = document.createElement('div');
+    vendDropdown.className = 'typeahead-dropdown';
+    selectors.vendedorInput.parentNode.appendChild(vendDropdown);
+
+    const doSearchCli = debounce(async (e)=>{
+        const q = e.target.value.trim();
+        if(!q) { cliDropdown.innerHTML=''; return; }
+        const items = await fetchClientes(q);
+        cliDropdown.innerHTML = items.map(it => `<div class="ta-item" data-id="${it.id}" data-codigo="${it.codigo}">${it.nombre} ${it.codigo ? '('+it.codigo+')':''}</div>`).join('');
+    }, 250);
+
+    const doSearchVend = debounce(async (e)=>{
+        const q = e.target.value.trim();
+        if(!q) { vendDropdown.innerHTML=''; return; }
+        const items = await fetchVendedores(q);
+        vendDropdown.innerHTML = items.map(it => `<div class="ta-item" data-id="${it.id}" data-username="${it.username}">${it.nombre_completo} ${it.username ? '('+it.username+')':''}</div>`).join('');
+    }, 250);
+
+    selectors.clienteInput.addEventListener('input', doSearchCli);
+    selectors.vendedorInput.addEventListener('input', doSearchVend);
+
+    // click handlers
+    document.addEventListener('click', (ev)=>{
+        const t = ev.target;
+        if(t.classList.contains('ta-item')){
+            const parent = t.parentNode;
+            if(parent === cliDropdown){
+                selectors.clienteInput.value = t.textContent;
+                selectors.clienteInput.dataset.id = t.dataset.id;
+                cliDropdown.innerHTML = '';
+            }else if(parent === vendDropdown){
+                selectors.vendedorInput.value = t.textContent;
+                selectors.vendedorInput.dataset.id = t.dataset.id;
+                vendDropdown.innerHTML = '';
+            }
+        } else {
+            // click outside -> close dropdowns
+            if(!t.closest('.typeahead-dropdown')){
+                cliDropdown.innerHTML=''; vendDropdown.innerHTML='';
+            }
+        }
+    });
+}
+
+// Attach autocomplete after login (apiFetch available)
+document.addEventListener('DOMContentLoaded', ()=>{
+    attachAutocomplete();
+});
 
 function showProductDetails(skus) {
     const productos = skus

@@ -1,12 +1,13 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Depends
 from typing import List
 from app.db import connection_scope, fetch_all
+from app.auth import get_current_user
 
 router = APIRouter(prefix="/api", tags=["vendedores"])
 
 
 @router.get("/vendedores")
-def list_vendedores(q: str = Query('', alias='q'), limit: int = 10, offset: int = 0) -> List[dict]:
+def list_vendedores(q: str = Query('', alias='q'), limit: int = 10, offset: int = 0, user=Depends(get_current_user)) -> List[dict]:
     with connection_scope() as conn:
         cur = conn.cursor()
         term = f"%{q}%"
@@ -16,7 +17,7 @@ def list_vendedores(q: str = Query('', alias='q'), limit: int = 10, offset: int 
 
 
 @router.get("/vendedores/{vendedor_id}")
-def get_vendedor(vendedor_id: int):
+def get_vendedor(vendedor_id: int, user=Depends(get_current_user)):
     with connection_scope() as conn:
         cur = conn.cursor()
         row = fetch_all(cur, "SELECT id, username, nombre_completo, email, rol, telefono FROM vendedores WHERE id = ?", (vendedor_id,))
