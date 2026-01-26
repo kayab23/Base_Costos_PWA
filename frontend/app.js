@@ -1500,8 +1500,22 @@ function renderCharts(m){
         // Apply chart font from CSS variables
         const __css = getComputedStyle(document.documentElement);
         const __chartFont = __css.getPropertyValue('--chart-font-family').trim() || "'Space Grotesk', 'Segoe UI', Arial, sans-serif";
+        const __fontColor = __css.getPropertyValue('--text').trim() || '#f6f8ff';
+        const __mutedColor = __css.getPropertyValue('--muted').trim() || '#9ea6c6';
         ventasLayout.font = ventasLayout.font || {};
         ventasLayout.font.family = __chartFont;
+        ventasLayout.title = ventasLayout.title || {};
+        ventasLayout.title.font = ventasLayout.title.font || {};
+        ventasLayout.title.font.family = __chartFont;
+        ventasLayout.title.font.color = __fontColor;
+        ventasLayout.xaxis = ventasLayout.xaxis || {};
+        ventasLayout.xaxis.title = ventasLayout.xaxis.title || {};
+        ventasLayout.xaxis.title.font = { family: __chartFont, color: __mutedColor, size: 12 };
+        ventasLayout.xaxis.tickfont = { family: __chartFont, color: __fontColor, size: 11 };
+        ventasLayout.yaxis = ventasLayout.yaxis || {};
+        ventasLayout.yaxis.title = ventasLayout.yaxis.title || {};
+        ventasLayout.yaxis.title.font = { family: __chartFont, color: __mutedColor, size: 12 };
+        ventasLayout.yaxis.tickfont = { family: __chartFont, color: __fontColor, size: 11 };
         Plotly.newPlot('ventasChart', [ventasTrace], ventasLayout, { responsive: true, displayModeBar: false });
 
         // Top clientes: donut con colores pastel y hover claro
@@ -1522,7 +1536,14 @@ function renderCharts(m){
             marker: { colors: pastel.slice(0, Math.max(1, clients.length)) },
             hovertemplate: '%{label}<br>$%{value:,.0f} (%{percent})<extra></extra>'
         }];
-        const clientesLayout = { margin: { t: 36 }, title: { text: 'Top clientes', font: { size: 16, family: __chartFont } }, showlegend: false, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(255,255,255,0.02)', font: { family: __chartFont } };
+        const clientesLayout = {
+            margin: { t: 36 },
+            title: { text: 'Top clientes', font: { size: 16, family: __chartFont, color: __fontColor } },
+            showlegend: false,
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(255,255,255,0.02)',
+            font: { family: __chartFont, color: __fontColor }
+        };
         Plotly.newPlot('topClients', data, clientesLayout, { responsive: true, displayModeBar: false });
     } catch (e) { console.error('renderCharts error', e); }
 }
