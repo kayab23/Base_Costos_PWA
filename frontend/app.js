@@ -1481,11 +1481,8 @@ function renderCharts(m){
         const ventasTrace = {
             x: days.map(d=>d.date),
             y: days.map(d=>d.amount),
-            type: 'scatter',
-            mode: 'lines+markers',
-            fill: 'tozeroy',
-            line: { color: '#89CFF0', width: 2 },
-            marker: { color: '#89CFF0', size: 6 },
+            type: 'bar',
+            marker: { color: (__css.getPropertyValue('--chart-accent').trim() || '#89CFF0') },
             hovertemplate: '%{x}<br>$%{y:,.0f}<extra></extra>'
         };
         const ventasLayout = {
@@ -1495,7 +1492,8 @@ function renderCharts(m){
             yaxis: { title: 'Monto (MXN)' },
             hovermode: 'closest',
             paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(255,255,255,0.02)'
+            plot_bgcolor: 'rgba(255,255,255,0.02)',
+            barmode: 'group'
         };
         // Apply chart font from CSS variables
         const __css = getComputedStyle(document.documentElement);
@@ -1785,85 +1783,4 @@ function loadDemoMetrics(){
 // Cierre automático de cualquier bloque abierto (por si acaso)
 // (No se agrega código funcional, solo se asegura el cierre de bloques)
 
-// Inicializar tooltips responsivos para elementos `.metric-info` (se usan data-tooltip)
-(function(){
-    let activeTip = null;
-    function createTip(text){
-        const d = document.createElement('div');
-        d.className = 'live-tooltip';
-        d.style.position = 'fixed';
-        d.style.zIndex = 20000;
-        d.style.background = 'rgba(0,0,0,0.85)';
-        d.style.color = '#fff';
-        d.style.padding = '8px 10px';
-        d.style.borderRadius = '6px';
-        d.style.maxWidth = '360px';
-        d.style.fontSize = '13px';
-        d.style.lineHeight = '1.2';
-        d.style.pointerEvents = 'none';
-        d.style.boxShadow = '0 6px 24px rgba(0,0,0,0.4)';
-        d.textContent = text;
-        document.body.appendChild(d);
-        return d;
-    }
-    function positionTip(el, tip){
-        if(!el || !tip) return;
-        const pad = 8;
-        const rect = el.getBoundingClientRect();
-        const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
-        const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
-        // Preferred above the element, centered
-        tip.style.maxWidth = Math.min(360, vw - 32) + 'px';
-        tip.style.whiteSpace = 'normal';
-        tip.style.left = '0px'; tip.style.top = '0px';
-        // compute
-        const tipRect = tip.getBoundingClientRect();
-        let left = rect.left + (rect.width/2) - (tipRect.width/2);
-        let top = rect.top - tipRect.height - pad;
-        // If it would go off left/right, clamp
-        if (left < 8) left = 8;
-        if (left + tipRect.width > vw - 8) left = Math.max(8, vw - 8 - tipRect.width);
-        // If not enough space above, show below the element
-        if (top < 8) top = rect.bottom + pad;
-        // If still off-screen vertically, clamp
-        if (top + tipRect.height > vh - 8) top = Math.max(8, vh - 8 - tipRect.height);
-        tip.style.left = Math.round(left) + 'px';
-        tip.style.top = Math.round(top) + 'px';
-    }
-
-    // delegation: show tooltip on mouseenter, hide on mouseleave
-    document.addEventListener('pointerenter', (e)=>{
-        const t = e.target.closest && e.target.closest('.metric-info');
-        if (!t) return;
-        const txt = t.getAttribute('data-tooltip') || t.dataset.tooltip || '';
-        if (!txt) return;
-        if (activeTip) { activeTip.remove(); activeTip = null; }
-        activeTip = createTip(txt);
-        // small delay to allow DOM to paint and get accurate size
-        requestAnimationFrame(()=> positionTip(t, activeTip));
-    }, true);
-    document.addEventListener('pointerleave', (e)=>{
-        const t = e.target.closest && e.target.closest('.metric-info');
-        if (!t) return;
-        if (activeTip) { activeTip.remove(); activeTip = null; }
-    }, true);
-    // reposition on scroll/resize while tooltip visible
-    ['scroll','resize'].forEach(ev => window.addEventListener(ev, ()=>{ if(activeTip){ const el = document.querySelector('.metric-info[aria-active="true"]') || document.querySelector('.metric-info'); if(el) positionTip(el, activeTip); }}));
-    // mark hovered element so we can find it when repositioning
-    document.addEventListener('pointermove', (e)=>{
-        const t = e.target.closest && e.target.closest('.metric-info');
-        if (t && activeTip) {
-            t.setAttribute('aria-active','true');
-            positionTip(t, activeTip);
-        } else {
-            document.querySelectorAll('.metric-info[aria-active]')?.forEach(x=>x.removeAttribute('aria-active'));
-        }
-    }, true);
-    // ensure CSS for live-tooltip if not present
-    if (!document.getElementById('live-tooltip-style')){
-        const s = document.createElement('style');
-        s.id = 'live-tooltip-style';
-        s.innerHTML = `.live-tooltip{transition:opacity .12s ease,transform .12s ease;opacity:1;}`;
-        document.head.appendChild(s);
-    }
-})();
+// Tooltips use CSS pseudo-element on `.metric-info` to avoid duplication.
