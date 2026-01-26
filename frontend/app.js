@@ -1536,8 +1536,9 @@ function renderCharts(m){
             }
         }
 
-        // Top clientes: donut con colores pastel y hover claro
+        // Top clientes OR ventas por vendedor
         const clients = m.top_clients || [];
+        const vendedores = m.by_vendedor || [];
         const pastel = [
             __css.getPropertyValue('--chart-palette-1').trim() || '#FFD1DC',
             __css.getPropertyValue('--chart-palette-2').trim() || '#C8E7FF',
@@ -1546,23 +1547,48 @@ function renderCharts(m){
             __css.getPropertyValue('--chart-palette-5').trim() || '#E9D6FF',
             __css.getPropertyValue('--chart-palette-6').trim() || '#FDEBD0'
         ];
-        const data = [{
-            labels: clients.map(c => c.name),
-            values: clients.map(c => c.amount),
-            type: 'pie',
-            hole: 0.45,
-            marker: { colors: pastel.slice(0, Math.max(1, clients.length)) },
-            hovertemplate: '%{label}<br>$%{value:,.0f} (%{percent})<extra></extra>'
-        }];
-        const clientesLayout = {
-            margin: { t: 36 },
-            title: { text: 'Top clientes', font: { size: 16, family: __chartFont, color: __fontColor } },
-            showlegend: false,
-            paper_bgcolor: 'rgba(0,0,0,0)',
-            plot_bgcolor: 'rgba(255,255,255,0.02)',
-            font: { family: __chartFont, color: __fontColor }
-        };
-        Plotly.newPlot('topClients', data, clientesLayout, { responsive: true, displayModeBar: false });
+        // If backend provided vendedor aggregates, show ventas por vendedor (barra)
+        if (vendedores && vendedores.length > 0) {
+            const labels = vendedores.map(v=>v.vendedor);
+            const values = vendedores.map(v=> (v.closed_total && v.closed_total>0) ? v.closed_total : v.total_value);
+            const quotes = vendedores.map(v=>v.quotes_count||0);
+            const closed = vendedores.map(v=>v.closed_count||0);
+            const barTrace = {
+                x: labels,
+                y: values,
+                type: 'bar',
+                marker: { color: pastel.slice(0, Math.max(1, labels.length)) },
+                hovertemplate: '%{x}<br>$%{y:,.0f}<br>Quotes: %{customdata[0]} Closed: %{customdata[1]}<extra></extra>',
+                customdata: labels.map((_,i)=>[quotes[i], closed[i]])
+            };
+            const vLayout = {
+                margin: { t: 36 },
+                title: { text: 'Ventas por vendedor', font: { size: 16, family: __chartFont, color: __fontColor } },
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(255,255,255,0.02)',
+                font: { family: __chartFont, color: __fontColor },
+                xaxis: { tickangle: -45 }
+            };
+            Plotly.newPlot('topClients', [barTrace], vLayout, { responsive: true, displayModeBar: false });
+        } else {
+            const data = [{
+                labels: clients.map(c => c.name),
+                values: clients.map(c => c.amount),
+                type: 'pie',
+                hole: 0.45,
+                marker: { colors: pastel.slice(0, Math.max(1, clients.length)) },
+                hovertemplate: '%{label}<br>$%{value:,.0f} (%{percent})<extra></extra>'
+            }];
+            const clientesLayout = {
+                margin: { t: 36 },
+                title: { text: 'Top clientes', font: { size: 16, family: __chartFont, color: __fontColor } },
+                showlegend: false,
+                paper_bgcolor: 'rgba(0,0,0,0)',
+                plot_bgcolor: 'rgba(255,255,255,0.02)',
+                font: { family: __chartFont, color: __fontColor }
+            };
+            Plotly.newPlot('topClients', data, clientesLayout, { responsive: true, displayModeBar: false });
+        }
         try { if (window.Plotly && Plotly.Plots && document.getElementById('topClients')) Plotly.Plots.resize(document.getElementById('topClients')); } catch (rerr) { console.warn('resize topClients failed', rerr); }
         if (!clients || clients.length === 0 || (Array.isArray(data[0].values) && data[0].values.every(v=>!v))) {
             const c2 = document.getElementById('topClients');
