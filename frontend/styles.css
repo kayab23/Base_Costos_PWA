@@ -37,6 +37,16 @@
     --accent: #5cf7d6;
     --accent-strong: #18cba2;
     font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+
+    /* Chart theme variables */
+    --chart-font-family: 'Space Grotesk', 'Segoe UI', Arial, sans-serif;
+    --chart-palette-1: #FFD1DC;
+    --chart-palette-2: #C8E7FF;
+    --chart-palette-3: #D6F5D6;
+    --chart-palette-4: #FFE7C6;
+    --chart-palette-5: #E9D6FF;
+    --chart-palette-6: #FDEBD0;
+    --chart-accent: #89CFF0;
 }
 
 * { box-sizing: border-box; margin: 0; }

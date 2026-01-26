@@ -1497,11 +1497,23 @@ function renderCharts(m){
             paper_bgcolor: 'rgba(0,0,0,0)',
             plot_bgcolor: 'rgba(255,255,255,0.02)'
         };
+        // Apply chart font from CSS variables
+        const __css = getComputedStyle(document.documentElement);
+        const __chartFont = __css.getPropertyValue('--chart-font-family').trim() || "'Space Grotesk', 'Segoe UI', Arial, sans-serif";
+        ventasLayout.font = ventasLayout.font || {};
+        ventasLayout.font.family = __chartFont;
         Plotly.newPlot('ventasChart', [ventasTrace], ventasLayout, { responsive: true, displayModeBar: false });
 
         // Top clientes: donut con colores pastel y hover claro
         const clients = m.top_clients || [];
-        const pastel = ['#FFD1DC','#C8E7FF','#D6F5D6','#FFE7C6','#E9D6FF','#FDEBD0','#CFEAF0','#F8D7E0'];
+        const pastel = [
+            __css.getPropertyValue('--chart-palette-1').trim() || '#FFD1DC',
+            __css.getPropertyValue('--chart-palette-2').trim() || '#C8E7FF',
+            __css.getPropertyValue('--chart-palette-3').trim() || '#D6F5D6',
+            __css.getPropertyValue('--chart-palette-4').trim() || '#FFE7C6',
+            __css.getPropertyValue('--chart-palette-5').trim() || '#E9D6FF',
+            __css.getPropertyValue('--chart-palette-6').trim() || '#FDEBD0'
+        ];
         const data = [{
             labels: clients.map(c => c.name),
             values: clients.map(c => c.amount),
@@ -1510,7 +1522,7 @@ function renderCharts(m){
             marker: { colors: pastel.slice(0, Math.max(1, clients.length)) },
             hovertemplate: '%{label}<br>$%{value:,.0f} (%{percent})<extra></extra>'
         }];
-        const clientesLayout = { margin: { t: 36 }, title: { text: 'Top clientes', font: { size: 16 } }, showlegend: false, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(255,255,255,0.02)' };
+        const clientesLayout = { margin: { t: 36 }, title: { text: 'Top clientes', font: { size: 16, family: __chartFont } }, showlegend: false, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(255,255,255,0.02)', font: { family: __chartFont } };
         Plotly.newPlot('topClients', data, clientesLayout, { responsive: true, displayModeBar: false });
     } catch (e) { console.error('renderCharts error', e); }
 }
