@@ -156,3 +156,12 @@ python manage_users.py create --username admin --password Admin123! --rol admin
 2. Implementar 2FA para roles críticos
 3. Dockerizar aplicación
 4. CI/CD con GitHub Actions
+
+---
+
+## Cambios Recientes: Dashboard de Vendedores (2026-01-26)
+
+- Se integró un panel de métricas para vendedores en la interfaz (`frontend/index.html`).
+- Se añadió soporte de datos demo (`loadDemoMetrics`) y tooltips responsivos para tarjetas.
+- Se corrigieron errores de front-end (JS) y se añadieron validaciones y manejo de errores en `apiFetch()`.
+- Ver detalle en `docs/DASHBOARD_CHANGELOG.md`.

@@ -242,6 +242,49 @@
         </section>
     </main>
 
+        <!-- Dashboard integrado en la interfaz de roles -->
+        <section class="card" id="dashboard-section" style="display:none;">
+            <header>
+                <h3>Panel de Métricas (Vendedores)</h3>
+                <div style="display:flex; gap:0.5rem; align-items:center;">
+                    <label>Periodo: <select id="dash-period"><option value="30">30 días</option><option value="90">90 días</option><option value="365">Año</option></select></label>
+                    <label>Vendedor: <select id="dash-vendedor"><option value="all">Todos</option></select></label>
+                    <button id="dash-refresh" class="ghost">🔄 Refrescar</button>
+                    <button id="dash-demo" class="ghost">🎛️ Cargar demo</button>
+                </div>
+            </header>
+            <div class="grid" style="margin-top:12px">
+                <div class="card metric-card">
+                    <h4>Total Ventas <span class="metric-info" data-tooltip="Suma del valor de las cotizaciones en el periodo seleccionado. Mide el volumen comercial y ayuda a seguir la tendencia de ventas.">i</span></h4>
+                    <div id="totalVentas">—</div>
+                </div>
+                <div class="card metric-card">
+                    <h4>Promedio Valor <span class="metric-info" data-tooltip="Valor promedio por cotización. Indica el tamaño medio de los negocios y ayuda a detectar cambios en mix de clientes o productos.">i</span></h4>
+                    <div id="avgValor">—</div>
+                </div>
+                <div class="card metric-card">
+                    <h4>Win Rate <span class="metric-info" data-tooltip="Porcentaje de cotizaciones ganadas respecto al total. Es una métrica de efectividad comercial y evaluación de conversión.">i</span></h4>
+                    <div id="winRate">—</div>
+                </div>
+                <div class="card metric-card">
+                    <h4>Avg Margin <span class="metric-info" data-tooltip="Margen promedio obtenido sobre las ventas. Mide rentabilidad y permite controlar descuentos y políticas de precio.">i</span></h4>
+                    <div id="avgMargin">—</div>
+                </div>
+            </div>
+            <h4 style="margin-top:12px">Gráficas</h4>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="card"><div id="ventasChart" style="height:260px"></div></div>
+                <div class="card"><div id="topClients" style="height:260px"></div></div>
+            </div>
+            <h4 style="margin-top:12px">Cotizaciones Recientes</h4>
+            <div class="table-wrapper"><table id="cotTable" class="display" style="width:100%"><thead><tr><th>Folio</th><th>Fecha</th><th>Cliente</th><th>Vendedor</th><th>Valor</th><th>Estado</th></tr></thead><tbody></tbody></table></div>
+        </section>
+
+    <!-- Librerías para el dashboard (Plotly, jQuery, DataTables) -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/datatables.net@1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+
     <script src="app.js" type="module"></script>
     <!-- Modal para solicitud de descuento adicional -->
     <div id="discount-modal" class="modal" style="display:none;">

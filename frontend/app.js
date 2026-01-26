@@ -65,6 +65,7 @@ const state = {
     userRole: localStorage.getItem('userRole') || null, // Nuevo: almacenar rol
     productos: [], // Cache de productos para búsqueda rápida
     landedData: [], // Almacenar últimos resultados para descarga
+    dashboardInitialized: false,
 };
 
 // Timers para debounce por SKU cuando se escribe el monto propuesto
@@ -99,6 +100,22 @@ const selectors = {
     productDetails: document.getElementById('product-details'),
 };
 
+// Diagnóstico ligero: marcar y escuchar clicks en el botón de conectar
+if (selectors.connectBtn) {
+    try {
+        // marca para que podamos verificar desde la consola si el listener diagnóstico está presente
+        selectors.connectBtn.dataset.debugListener = 'pending';
+        // listener ligero que siempre debe ejecutarse al hacer click (no interfiere con el handler principal)
+        selectors.connectBtn.addEventListener('click', (ev) => {
+            console.debug('[diagnostic] connect-btn clicked');
+            selectors.connectBtn.dataset.debugListener = 'clicked';
+            showToast('Diagnóstico: botón Autenticar detectado (click).', 'info', 1200);
+        }, { capture: true });
+    } catch (e) {
+        console.error('diagnostic attach error', e);
+    }
+}
+
 if (state.baseUrl) selectors.apiUrl.value = state.baseUrl;
 if (state.auth) selectors.status.textContent = 'Sesión guardada (reautenticar si es necesario).';
 
@@ -130,38 +147,51 @@ function initLoginOnlyView() {
 initLoginOnlyView();
 
 async function apiFetch(path, options = {}) {
-    if (!state.auth) {
-        throw new Error('No hay sesión activa');
+    // No lanzar aquí si no hay sesión: permitir que endpoints públicos funcionen
+    const headers = {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+    };
+    if (state.auth) {
+        headers.Authorization = `Bearer ${state.auth}`;
     }
     const response = await fetch(`${state.baseUrl}${path}`, {
         ...options,
-        headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${state.auth}`,
-            ...(options.headers || {}),
-        },
+        headers,
     });
-    if (!response.ok) {
-        let detail = '';
-        let help = '';
-        try {
-            const contentType = response.headers.get('content-type') || '';
-            if (contentType.includes('application/json')) {
-                const err = await response.json();
-                detail = err.detail || JSON.stringify(err);
-            } else {
-                detail = await response.text();
+    try {
+        if (!response.ok) {
+            let detail = '';
+            let help = '';
+            try {
+                const contentType = response.headers.get('content-type') || '';
+                if (contentType.includes('application/json')) {
+                    const err = await response.json();
+                    detail = err.detail || JSON.stringify(err);
+                } else {
+                    detail = await response.text();
+                }
+                help = response.headers.get('x-help') || '';
+            } catch (e) {
+                detail = 'Error inesperado al procesar la respuesta del servidor.';
             }
-            help = response.headers.get('x-help') || '';
-        } catch (e) {
-            detail = 'Error inesperado al procesar la respuesta del servidor.';
+            const msg = `Error ${response.status}: ${detail}` + (help ? `\nSugerencia: ${help}` : '');
+            showToast(msg, 'error');
+            throw new Error(msg);
         }
-        let msg = `Error ${response.status}: ${detail}`;
-        if (help) msg += `\nSugerencia: ${help}`;
-        showToast(msg, 'error');
-        throw new Error(msg);
+        // Some endpoints may return empty body
+        const ct = response.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) {
+            // return text for non-json responses
+            return await response.text();
+        }
+        return await response.json();
+    } catch (netErr) {
+        // Network or parsing error
+        const errMsg = netErr && netErr.message ? netErr.message : String(netErr);
+        showToast('Error de red o respuesta inválida: ' + errMsg, 'error');
+        throw netErr;
     }
-    return response.json();
 }
 
 selectors.connectBtn.addEventListener('click', async () => {
@@ -683,6 +713,38 @@ function updateUIForRole() {
         if (procesadasSection) procesadasSection.style.display = 'block';
         loadPendientes();
         loadProcesadas();
+    }
+    // Mostrar/ocultar dashboard integrado según rol
+    try {
+        const dashboardSection = document.getElementById('dashboard-section');
+        const allowedRoles = ['Vendedor','Gerencia_Comercial','Gerencia','Subdireccion','Direccion','Admin'];
+        if (dashboardSection) {
+            if (allowedRoles.includes(role)) {
+                dashboardSection.style.display = 'block';
+                // Inicializar dashboard (permitir modo demo sin sesión para validación)
+                if (!state.dashboardInitialized) {
+                    if (typeof initDashboard === 'function') {
+                        try {
+                            initDashboard();
+                            state.dashboardInitialized = true;
+                        } catch (err) {
+                            console.error('initDashboard failed', err);
+                        }
+                    } else {
+                        // reintentar en breve si la función aún no fue definida
+                        setTimeout(() => {
+                            if (typeof initDashboard === 'function' && !state.dashboardInitialized) {
+                                try { initDashboard(); state.dashboardInitialized = true; } catch (err) { console.error('initDashboard retry failed', err); }
+                            }
+                        }, 200);
+                    }
+                }
+            } else {
+                dashboardSection.style.display = 'none';
+            }
+        }
+    } catch (e) {
+        console.error('dashboard visibility error', e);
     }
 }
 
@@ -1411,5 +1473,227 @@ document.addEventListener('input', function(e) {
     }
 });
 
+// ------------------ Dashboard integrado ------------------
+async function fetchDashboardMetrics(periodDays=30, vendedor='all'){
+    const q = new URLSearchParams({ periodDays, vendedor });
+    const url = `${state.baseUrl}/api/dashboard/metrics?${q.toString()}`;
+    const resp = await fetch(url, { headers: { Authorization: state.auth ? `Bearer ${state.auth}` : '' } });
+    if (!resp.ok) throw new Error('No se pudieron obtener métricas');
+    return resp.json();
+}
+
+function renderSummary(m){
+    document.getElementById('totalVentas').innerText = m.total_sales_formatted || '-';
+    document.getElementById('avgValor').innerText = m.avg_value_formatted || '-';
+    document.getElementById('winRate').innerText = m.win_rate_percent ? m.win_rate_percent + '%' : '-';
+    document.getElementById('avgMargin').innerText = m.avg_margin_percent ? m.avg_margin_percent + '%' : '-';
+}
+
+function renderCharts(m){
+    try{
+        const ventasTrace = { x: (m.sales_by_day||[]).map(d=>d.date), y: (m.sales_by_day||[]).map(d=>d.amount), type: 'scatter' };
+        Plotly.newPlot('ventasChart', [ventasTrace], {margin:{t:10}});
+        const clients = m.top_clients || [];
+        const data = [{ labels: clients.map(c=>c.name), values: clients.map(c=>c.amount), type: 'pie' }];
+        Plotly.newPlot('topClients', data, {margin:{t:10}});
+    }catch(e){ console.error('renderCharts error', e); }
+}
+
+function renderTable(rows){
+    const tbody = document.querySelector('#cotTable tbody');
+    if (!tbody) return;
+    try {
+        tbody.innerHTML = '';
+        rows.forEach(r=>{
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td><a href="/api/cotizacion/pdf/${r.id}" target="_blank">${r.folio}</a></td><td>${r.fecha}</td><td>${r.cliente}</td><td>${r.vendedor}</td><td>${r.valor_formatted}</td><td>${r.estado}</td>`;
+            tbody.appendChild(tr);
+        });
+        // Try to initialize DataTable only if jQuery and DataTables are available
+        if (typeof window.jQuery !== 'undefined' && window.jQuery.fn && window.jQuery.fn.dataTable) {
+            try {
+                if (!window.jQuery.fn.dataTable.isDataTable('#cotTable')) {
+                    window.jQuery('#cotTable').DataTable();
+                }
+            } catch (dtErr) {
+                console.warn('DataTable init failed', dtErr);
+            }
+        } else {
+            // If DataTables not available, leave simple table and ensure no errors
+        }
+    } catch (err) {
+        console.error('renderTable error', err);
+        // Show a simple fallback message in the table
+        tbody.innerHTML = '<tr><td colspan="6" style="color:var(--muted);">No fue posible renderizar la tabla de cotizaciones.</td></tr>';
+    }
+}
+
+async function refreshDashboard(){
+    try{
+        const period = document.getElementById('dash-period')?.value || '30';
+        const vendedor = document.getElementById('dash-vendedor')?.value || 'all';
+        const but = document.getElementById('dash-refresh'); if (but) but.disabled = true;
+        const m = await fetchDashboardMetrics(period, vendedor);
+        renderSummary(m);
+        renderCharts(m);
+        renderTable(m.recent_quotes || []);
+        if (but) but.disabled = false;
+    }catch(e){ console.error('refreshDashboard', e); showToast('Error cargando métricas','error'); const but=document.getElementById('dash-refresh'); if(but) but.disabled=false; }
+}
+
+async function initDashboard(){
+    try{
+        // populate vendedores selector
+        const vsel = document.getElementById('dash-vendedor');
+        if (vsel) {
+            try{
+                const res = await apiFetch('/api/vendedores?limit=200');
+                (res || []).forEach(x=>{ const o = document.createElement('option'); o.value = x.id || x.nombre || 'all'; o.textContent = x.nombre || x.id; vsel.appendChild(o); });
+            }catch(e){ /* ignore */ }
+        }
+        document.getElementById('dash-refresh')?.addEventListener('click', refreshDashboard);
+        document.getElementById('dash-demo')?.addEventListener('click', ()=>{ loadDemoMetrics(); });
+        document.getElementById('dash-period')?.addEventListener('change', refreshDashboard);
+        document.getElementById('dash-vendedor')?.addEventListener('change', refreshDashboard);
+        // primera carga
+        await refreshDashboard();
+    }catch(e){ console.error('initDashboard error', e); }
+}
+
+function sampleMetrics(){
+    const days = [];
+    const today = new Date();
+    for(let i=29;i>=0;i--){
+        const d = new Date(today);
+        d.setDate(d.getDate()-i);
+        const label = d.toISOString().slice(0,10);
+        const amount = Math.round(20000 + Math.random()*80000);
+        days.push({ date: label, amount });
+    }
+    const top_clients = [
+        { name: 'IMSS CENTRO', amount: 130000 },
+        { name: 'PROVECTUS MEDICAL', amount: 94358 },
+        { name: 'Cliente Demo A', amount: 60000 },
+        { name: 'Cliente Demo B', amount: 35000 }
+    ];
+    const recent = [];
+    for(let i=0;i<12;i++){
+        const id = 100+i;
+        recent.push({ id, folio: `DEMO-${id.toString().padStart(3,'0')}`, fecha: new Date(Date.now() - i*3600*1000).toLocaleString('es-MX'), cliente: top_clients[i%top_clients.length].name, vendedor: 'vendedor-demo', valor: Math.round(10000+Math.random()*40000), valor_formatted: '$' + Math.round(10000+Math.random()*40000).toLocaleString('es-MX'), estado: 'N/A' });
+    }
+    return {
+        period_days: 30,
+        total_sales: days.reduce((s,d)=>s+d.amount,0),
+        total_sales_formatted: '$' + days.reduce((s,d)=>s+d.amount,0).toLocaleString('es-MX'),
+        quote_count: recent.length,
+        sales_by_day: days,
+        top_clients,
+        avg_discount_percent: 8.5,
+        avg_discount_percent_formatted: '8.50%',
+        recent_quotes: recent,
+        avg_value_formatted: '$' + Math.round((days.reduce((s,d)=>s+d.amount,0)/recent.length)).toLocaleString('es-MX'),
+        win_rate_percent: 32,
+        avg_margin_percent: 18
+    };
+}
+
+function loadDemoMetrics(){
+    try {
+        const m = sampleMetrics();
+        renderSummary(m);
+        renderCharts(m);
+        renderTable(m.recent_quotes || []);
+        showToast('Datos demo cargados.', 'success', 2000);
+    } catch (err) {
+        console.error('loadDemoMetrics error', err);
+        showToast('Error cargando datos demo: ' + (err.message || err), 'error', 5000);
+    }
+}
+
+// ---------------------------------------------------------
+
 // Cierre automático de cualquier bloque abierto (por si acaso)
 // (No se agrega código funcional, solo se asegura el cierre de bloques)
+
+// Inicializar tooltips responsivos para elementos `.metric-info` (se usan data-tooltip)
+(function(){
+    let activeTip = null;
+    function createTip(text){
+        const d = document.createElement('div');
+        d.className = 'live-tooltip';
+        d.style.position = 'fixed';
+        d.style.zIndex = 20000;
+        d.style.background = 'rgba(0,0,0,0.85)';
+        d.style.color = '#fff';
+        d.style.padding = '8px 10px';
+        d.style.borderRadius = '6px';
+        d.style.maxWidth = '360px';
+        d.style.fontSize = '13px';
+        d.style.lineHeight = '1.2';
+        d.style.pointerEvents = 'none';
+        d.style.boxShadow = '0 6px 24px rgba(0,0,0,0.4)';
+        d.textContent = text;
+        document.body.appendChild(d);
+        return d;
+    }
+    function positionTip(el, tip){
+        if(!el || !tip) return;
+        const pad = 8;
+        const rect = el.getBoundingClientRect();
+        const vw = Math.max(document.documentElement.clientWidth || 0, window.innerWidth || 0);
+        const vh = Math.max(document.documentElement.clientHeight || 0, window.innerHeight || 0);
+        // Preferred above the element, centered
+        tip.style.maxWidth = Math.min(360, vw - 32) + 'px';
+        tip.style.whiteSpace = 'normal';
+        tip.style.left = '0px'; tip.style.top = '0px';
+        // compute
+        const tipRect = tip.getBoundingClientRect();
+        let left = rect.left + (rect.width/2) - (tipRect.width/2);
+        let top = rect.top - tipRect.height - pad;
+        // If it would go off left/right, clamp
+        if (left < 8) left = 8;
+        if (left + tipRect.width > vw - 8) left = Math.max(8, vw - 8 - tipRect.width);
+        // If not enough space above, show below the element
+        if (top < 8) top = rect.bottom + pad;
+        // If still off-screen vertically, clamp
+        if (top + tipRect.height > vh - 8) top = Math.max(8, vh - 8 - tipRect.height);
+        tip.style.left = Math.round(left) + 'px';
+        tip.style.top = Math.round(top) + 'px';
+    }
+
+    // delegation: show tooltip on mouseenter, hide on mouseleave
+    document.addEventListener('pointerenter', (e)=>{
+        const t = e.target.closest && e.target.closest('.metric-info');
+        if (!t) return;
+        const txt = t.getAttribute('data-tooltip') || t.dataset.tooltip || '';
+        if (!txt) return;
+        if (activeTip) { activeTip.remove(); activeTip = null; }
+        activeTip = createTip(txt);
+        // small delay to allow DOM to paint and get accurate size
+        requestAnimationFrame(()=> positionTip(t, activeTip));
+    }, true);
+    document.addEventListener('pointerleave', (e)=>{
+        const t = e.target.closest && e.target.closest('.metric-info');
+        if (!t) return;
+        if (activeTip) { activeTip.remove(); activeTip = null; }
+    }, true);
+    // reposition on scroll/resize while tooltip visible
+    ['scroll','resize'].forEach(ev => window.addEventListener(ev, ()=>{ if(activeTip){ const el = document.querySelector('.metric-info[aria-active="true"]') || document.querySelector('.metric-info'); if(el) positionTip(el, activeTip); }}));
+    // mark hovered element so we can find it when repositioning
+    document.addEventListener('pointermove', (e)=>{
+        const t = e.target.closest && e.target.closest('.metric-info');
+        if (t && activeTip) {
+            t.setAttribute('aria-active','true');
+            positionTip(t, activeTip);
+        } else {
+            document.querySelectorAll('.metric-info[aria-active]')?.forEach(x=>x.removeAttribute('aria-active'));
+        }
+    }, true);
+    // ensure CSS for live-tooltip if not present
+    if (!document.getElementById('live-tooltip-style')){
+        const s = document.createElement('style');
+        s.id = 'live-tooltip-style';
+        s.innerHTML = `.live-tooltip{transition:opacity .12s ease,transform .12s ease;opacity:1;}`;
+        document.head.appendChild(s);
+    }
+})();

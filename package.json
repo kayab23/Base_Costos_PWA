@@ -1,0 +1,16 @@
+{
+  "name": "base-costos-dashboard",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "echo no-op",
+    "start": "echo serve static files"
+  },
+  "dependencies": {
+    "plotly.js-dist-min": "^2.24.1",
+    "chart.js": "^4.4.0",
+    "datatables.net": "^1.13.6",
+    "datatables.net-dt": "^1.13.6",
+    "tailwindcss": "^3.5.5"
+  }
+}

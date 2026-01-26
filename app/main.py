@@ -14,8 +14,9 @@ from slowapi import _rate_limit_exceeded_handler
 from app.limiter import limiter
 from slowapi.errors import RateLimitExceeded
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from .config import settings
-from .routes import catalog, pricing, auth, autorizaciones, pdf, clientes, vendedores, cotizaciones
+from .routes import catalog, pricing, auth, autorizaciones, pdf, clientes, vendedores, cotizaciones, dashboard
 from .logger import logger
 from .db import connection_scope
 
@@ -33,6 +34,9 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+# Servir archivos estáticos del frontend (dashboard, index, assets)
+app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+
 # Registrar routers de cada módulo funcional
 app.include_router(auth.router)
 app.include_router(catalog.router)
@@ -42,6 +46,7 @@ app.include_router(pdf.router)
 app.include_router(clientes.router)
 app.include_router(vendedores.router)
 app.include_router(cotizaciones.router)
+app.include_router(dashboard.router)
 
 # Variables para métricas simples (única definición)
 start_time = datetime.now(timezone.utc)
