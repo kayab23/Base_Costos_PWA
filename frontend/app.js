@@ -100,21 +100,6 @@ const selectors = {
     productDetails: document.getElementById('product-details'),
 };
 
-// Diagnóstico ligero: marcar y escuchar clicks en el botón de conectar
-if (selectors.connectBtn) {
-    try {
-        // marca para que podamos verificar desde la consola si el listener diagnóstico está presente
-        selectors.connectBtn.dataset.debugListener = 'pending';
-        // listener ligero que siempre debe ejecutarse al hacer click (no interfiere con el handler principal)
-        selectors.connectBtn.addEventListener('click', (ev) => {
-            console.debug('[diagnostic] connect-btn clicked');
-            selectors.connectBtn.dataset.debugListener = 'clicked';
-            showToast('Diagnóstico: botón Autenticar detectado (click).', 'info', 1200);
-        }, { capture: true });
-    } catch (e) {
-        console.error('diagnostic attach error', e);
-    }
-}
 
 if (state.baseUrl) selectors.apiUrl.value = state.baseUrl;
 if (state.auth) selectors.status.textContent = 'Sesión guardada (reautenticar si es necesario).';
@@ -1491,12 +1476,43 @@ function renderSummary(m){
 
 function renderCharts(m){
     try{
-        const ventasTrace = { x: (m.sales_by_day||[]).map(d=>d.date), y: (m.sales_by_day||[]).map(d=>d.amount), type: 'scatter' };
-        Plotly.newPlot('ventasChart', [ventasTrace], {margin:{t:10}});
+        // Ventas por día: línea con área rellenada y colores pastel
+        const days = m.sales_by_day || [];
+        const ventasTrace = {
+            x: days.map(d=>d.date),
+            y: days.map(d=>d.amount),
+            type: 'scatter',
+            mode: 'lines+markers',
+            fill: 'tozeroy',
+            line: { color: '#89CFF0', width: 2 },
+            marker: { color: '#89CFF0', size: 6 },
+            hovertemplate: '%{x}<br>$%{y:,.0f}<extra></extra>'
+        };
+        const ventasLayout = {
+            margin: { t: 40, l: 40, r: 20, b: 40 },
+            title: { text: 'Ventas por día', font: { size: 16 } },
+            xaxis: { title: 'Fecha', type: 'category', tickangle: -45 },
+            yaxis: { title: 'Monto (MXN)' },
+            hovermode: 'closest',
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(255,255,255,0.02)'
+        };
+        Plotly.newPlot('ventasChart', [ventasTrace], ventasLayout, { responsive: true, displayModeBar: false });
+
+        // Top clientes: donut con colores pastel y hover claro
         const clients = m.top_clients || [];
-        const data = [{ labels: clients.map(c=>c.name), values: clients.map(c=>c.amount), type: 'pie' }];
-        Plotly.newPlot('topClients', data, {margin:{t:10}});
-    }catch(e){ console.error('renderCharts error', e); }
+        const pastel = ['#FFD1DC','#C8E7FF','#D6F5D6','#FFE7C6','#E9D6FF','#FDEBD0','#CFEAF0','#F8D7E0'];
+        const data = [{
+            labels: clients.map(c => c.name),
+            values: clients.map(c => c.amount),
+            type: 'pie',
+            hole: 0.45,
+            marker: { colors: pastel.slice(0, Math.max(1, clients.length)) },
+            hovertemplate: '%{label}<br>$%{value:,.0f} (%{percent})<extra></extra>'
+        }];
+        const clientesLayout = { margin: { t: 36 }, title: { text: 'Top clientes', font: { size: 16 } }, showlegend: false, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(255,255,255,0.02)' };
+        Plotly.newPlot('topClients', data, clientesLayout, { responsive: true, displayModeBar: false });
+    } catch (e) { console.error('renderCharts error', e); }
 }
 
 function renderTable(rows){
