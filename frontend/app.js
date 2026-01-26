@@ -1509,14 +1509,32 @@ function renderCharts(m){
         ventasLayout.title.font.family = __chartFont;
         ventasLayout.title.font.color = __fontColor;
         ventasLayout.xaxis = ventasLayout.xaxis || {};
-        ventasLayout.xaxis.title = ventasLayout.xaxis.title || {};
-        ventasLayout.xaxis.title.font = { family: __chartFont, color: __mutedColor, size: 12 };
+        // xaxis.title can be a string or an object; normalize to object with `text` and `font`
+        if (typeof ventasLayout.xaxis.title === 'string') {
+            ventasLayout.xaxis.title = { text: ventasLayout.xaxis.title, font: { family: __chartFont, color: __mutedColor, size: 12 } };
+        } else {
+            ventasLayout.xaxis.title = ventasLayout.xaxis.title || {};
+            ventasLayout.xaxis.title.font = ventasLayout.xaxis.title.font || { family: __chartFont, color: __mutedColor, size: 12 };
+        }
         ventasLayout.xaxis.tickfont = { family: __chartFont, color: __fontColor, size: 11 };
         ventasLayout.yaxis = ventasLayout.yaxis || {};
-        ventasLayout.yaxis.title = ventasLayout.yaxis.title || {};
-        ventasLayout.yaxis.title.font = { family: __chartFont, color: __mutedColor, size: 12 };
+        if (typeof ventasLayout.yaxis.title === 'string') {
+            ventasLayout.yaxis.title = { text: ventasLayout.yaxis.title, font: { family: __chartFont, color: __mutedColor, size: 12 } };
+        } else {
+            ventasLayout.yaxis.title = ventasLayout.yaxis.title || {};
+            ventasLayout.yaxis.title.font = ventasLayout.yaxis.title.font || { family: __chartFont, color: __mutedColor, size: 12 };
+        }
         ventasLayout.yaxis.tickfont = { family: __chartFont, color: __fontColor, size: 11 };
         Plotly.newPlot('ventasChart', [ventasTrace], ventasLayout, { responsive: true, displayModeBar: false });
+        // Ensure Plotly recalculates size (in case container was hidden when first rendered)
+        try { if (window.Plotly && Plotly.Plots && document.getElementById('ventasChart')) Plotly.Plots.resize(document.getElementById('ventasChart')); } catch (rerr) { console.warn('resize ventasChart failed', rerr); }
+        // Fallback: if no data, show a lightweight message so user knows nothing loaded
+        if (!days || days.length === 0 || (Array.isArray(ventasTrace.y) && ventasTrace.y.every(v => !v))) {
+            const c = document.getElementById('ventasChart');
+            if (c) {
+                c.innerHTML = '<div style="color:var(--muted);font-family:var(--chart-font-family);display:flex;align-items:center;justify-content:center;height:100%">No hay datos de ventas para el periodo seleccionado.</div>';
+            }
+        }
 
         // Top clientes: donut con colores pastel y hover claro
         const clients = m.top_clients || [];
@@ -1545,6 +1563,13 @@ function renderCharts(m){
             font: { family: __chartFont, color: __fontColor }
         };
         Plotly.newPlot('topClients', data, clientesLayout, { responsive: true, displayModeBar: false });
+        try { if (window.Plotly && Plotly.Plots && document.getElementById('topClients')) Plotly.Plots.resize(document.getElementById('topClients')); } catch (rerr) { console.warn('resize topClients failed', rerr); }
+        if (!clients || clients.length === 0 || (Array.isArray(data[0].values) && data[0].values.every(v=>!v))) {
+            const c2 = document.getElementById('topClients');
+            if (c2) {
+                c2.innerHTML = '<div style="color:var(--muted);font-family:var(--chart-font-family);display:flex;align-items:center;justify-content:center;height:100%">No hay datos de clientes para el periodo seleccionado.</div>';
+            }
+        }
     } catch (e) { console.error('renderCharts error', e); }
 }
 
