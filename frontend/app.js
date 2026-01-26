@@ -1478,11 +1478,17 @@ function renderCharts(m){
     try{
         // Ventas por día: línea con área rellenada y colores pastel
         const days = m.sales_by_day || [];
+        // Apply chart font and colors from CSS variables (compute before using)
+        const __css = getComputedStyle(document.documentElement);
+        const __chartFont = __css.getPropertyValue('--chart-font-family').trim() || "'Space Grotesk', 'Segoe UI', Arial, sans-serif";
+        const __fontColor = __css.getPropertyValue('--text').trim() || '#f6f8ff';
+        const __mutedColor = __css.getPropertyValue('--muted').trim() || '#9ea6c6';
+        const accentColor = (__css.getPropertyValue('--chart-accent').trim() || '#89CFF0');
         const ventasTrace = {
             x: days.map(d=>d.date),
             y: days.map(d=>d.amount),
             type: 'bar',
-            marker: { color: (__css.getPropertyValue('--chart-accent').trim() || '#89CFF0') },
+            marker: { color: accentColor },
             hovertemplate: '%{x}<br>$%{y:,.0f}<extra></extra>'
         };
         const ventasLayout = {
@@ -1495,11 +1501,6 @@ function renderCharts(m){
             plot_bgcolor: 'rgba(255,255,255,0.02)',
             barmode: 'group'
         };
-        // Apply chart font from CSS variables
-        const __css = getComputedStyle(document.documentElement);
-        const __chartFont = __css.getPropertyValue('--chart-font-family').trim() || "'Space Grotesk', 'Segoe UI', Arial, sans-serif";
-        const __fontColor = __css.getPropertyValue('--text').trim() || '#f6f8ff';
-        const __mutedColor = __css.getPropertyValue('--muted').trim() || '#9ea6c6';
         ventasLayout.font = ventasLayout.font || {};
         ventasLayout.font.family = __chartFont;
         ventasLayout.title = ventasLayout.title || {};
@@ -1588,11 +1589,12 @@ function renderCharts(m){
             Plotly.newPlot('topClients', data, clientesLayout, { responsive: true, displayModeBar: false });
         }
         try { if (window.Plotly && Plotly.Plots && document.getElementById('topClients')) Plotly.Plots.resize(document.getElementById('topClients')); } catch (rerr) { console.warn('resize topClients failed', rerr); }
-        if (!clients || clients.length === 0 || (Array.isArray(data[0].values) && data[0].values.every(v=>!v))) {
-            const c2 = document.getElementById('topClients');
-            if (c2) {
-                c2.innerHTML = '<div style="color:var(--muted);font-family:var(--chart-font-family);display:flex;align-items:center;justify-content:center;height:100%">No hay datos de clientes para el periodo seleccionado.</div>';
-            }
+        // If no clientes and no vendedores data, show fallback message
+        const topClientsEl = document.getElementById('topClients');
+        const hasClientData = Array.isArray(clients) && clients.length > 0 && clients.some(c => Number(c.amount));
+        const hasVendedorData = Array.isArray(vendedores) && vendedores.length > 0 && vendedores.some(v => Number(v.total_value) || Number(v.closed_total));
+        if (topClientsEl && !hasClientData && !hasVendedorData) {
+            topClientsEl.innerHTML = '<div style="color:var(--muted);font-family:var(--chart-font-family);display:flex;align-items:center;justify-content:center;height:100%">No hay datos para el periodo seleccionado.</div>';
         }
     } catch (e) { console.error('renderCharts error', e); }
 }
@@ -1631,12 +1633,16 @@ function renderVendedorTable(vendedores){
     if (!tbody) return;
     try{
         tbody.innerHTML = '';
+        // store latest for export
+        state.latestVendedores = vendedores || [];
         const fmt = (v) => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(v);
         const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         (vendedores || []).forEach(v=>{
             const tr = document.createElement('tr');
             const closeRate = (v.quotes_count && v.closed_count) ? Math.round((v.closed_count / v.quotes_count)*10000)/100 : null;
-            tr.innerHTML = `<td>${esc(v.vendedor)}</td><td>${v.quotes_count||0}</td><td>${v.closed_count||0}</td><td>${v.total_value?fmt(v.total_value):'-'}</td><td>${v.closed_total?fmt(v.closed_total):'-'}</td><td>${closeRate!=null?closeRate+'%':'-'}</td><td>${v.avg_discount_percent!=null?v.avg_discount_percent+'%':'-'}</td><td>${v.avg_margin_percent!=null?v.avg_margin_percent+'%':'-'}</td>`;
+            // include a sparkline cell (series expected as array of numbers)
+            const series = Array.isArray(v.series) ? v.series : [];
+            tr.innerHTML = `<td>${esc(v.vendedor)}</td><td>${v.quotes_count||0}</td><td>${v.closed_count||0}</td><td>${v.total_value?fmt(v.total_value):'-'}</td><td>${v.closed_total?fmt(v.closed_total):'-'}</td><td>${closeRate!=null?closeRate+'%':'-'}</td><td>${v.avg_discount_percent!=null?v.avg_discount_percent+'%':'-'}</td><td>${v.avg_margin_percent!=null?v.avg_margin_percent+'%':'-'}</td><td class="sparkline-cell" data-series='${JSON.stringify(series)}' style="width:120px;"> </td>`;
             tbody.appendChild(tr);
         });
         if (typeof window.jQuery !== 'undefined' && window.jQuery.fn && window.jQuery.fn.dataTable) {
@@ -1648,6 +1654,76 @@ function renderVendedorTable(vendedores){
         }
     }catch(err){ console.error('renderVendedorTable error', err); tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);">No fue posible renderizar resumen por vendedor.</td></tr>'; }
 }
+
+// Render small inline SVG sparklines for each vendedor row
+function renderSparklines(){
+    try{
+        const cells = document.querySelectorAll('.sparkline-cell');
+        cells.forEach(cell=>{
+            const raw = cell.getAttribute('data-series') || '[]';
+            let series = [];
+            try{ series = JSON.parse(raw); }catch(e){ series = []; }
+            // draw only if we have numeric series
+            if (!Array.isArray(series) || series.length === 0) {
+                cell.innerHTML = '<div style="color:var(--muted);font-size:11px;text-align:center;">-</div>';
+                return;
+            }
+            const w = 120, h = 28, pad = 4;
+            const nums = series.map(n=>Number(n)||0);
+            const min = Math.min(...nums);
+            const max = Math.max(...nums);
+            const range = (max - min) || 1;
+            const points = nums.map((v,i)=>{
+                const x = pad + (i/(nums.length-1||1)) * (w - pad*2);
+                const y = pad + (1 - (v - min)/range) * (h - pad*2);
+                return `${x},${y}`;
+            }).join(' ');
+            const stroke = getComputedStyle(document.documentElement).getPropertyValue('--chart-accent').trim() || '#89CFF0';
+            const fill = stroke + '33';
+            cell.innerHTML = `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><polyline points="${points}" fill="none" stroke="${stroke}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+        });
+    }catch(e){ console.warn('renderSparklines failed', e); }
+}
+
+// CSV export for vendedor summary
+async function exportVendedoresCSV(){
+    try{
+        const rows = state.latestVendedores || [];
+        if (!rows.length) return showToast('No hay datos para exportar.', 'info');
+        const headers = ['vendedor','quotes_count','closed_count','total_value','closed_total','close_rate_pct','avg_discount_percent','avg_margin_percent','series'];
+        const lines = [headers.join(',')];
+        rows.forEach(r=>{
+            const closeRate = (r.quotes_count && r.closed_count) ? ((r.closed_count / r.quotes_count)*100).toFixed(2) : '';
+            const series = Array.isArray(r.series) ? r.series.join(';') : '';
+            const vals = [r.vendedor, r.quotes_count||0, r.closed_count||0, r.total_value||0, r.closed_total||0, closeRate, r.avg_discount_percent||'', r.avg_margin_percent||'', `"${series}"`];
+            lines.push(vals.map(v=>typeof v === 'string' ? `"${v.replace(/"/g,'""')}"` : v).join(','));
+        });
+        const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `resumen_vendedores_${new Date().toISOString().slice(0,10)}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+    }catch(e){ console.error('exportVendedoresCSV error', e); showToast('Error exportando CSV','error'); }
+}
+
+// Attach export button and ensure sparklines render after table updates
+document.addEventListener('click', (e)=>{
+    if (e.target && e.target.id === 'vendedor-export'){
+        exportVendedoresCSV();
+    }
+});
+
+// Ensure sparklines are rendered whenever the vendedor table is updated
+const origRenderVendedorTable = renderVendedorTable;
+renderVendedorTable = function(vendedores){
+    origRenderVendedorTable(vendedores);
+    // render sparklines after DOM update
+    renderSparklines();
+};
 
 // Lightweight client-side table search and sort (no DataTables)
 function _initVendedorTableHelpers(){
@@ -1784,3 +1860,68 @@ function loadDemoMetrics(){
 // (No se agrega código funcional, solo se asegura el cierre de bloques)
 
 // Tooltips use CSS pseudo-element on `.metric-info` to avoid duplication.
+// Replace CSS pseudo tooltips with a JS-driven tooltip to avoid overflow
+;(function(){
+    // create tooltip element
+    const tip = document.createElement('div');
+    tip.className = 'metric-tooltip hidden';
+    document.body.appendChild(tip);
+
+    let activeTarget = null;
+    let hideTimeout = null;
+
+    function showMetricTooltip(target){
+        const text = target.getAttribute('data-tooltip') || '';
+        if (!text) return;
+        activeTarget = target;
+        tip.textContent = text;
+        tip.classList.remove('hidden');
+        tip.classList.add('visible');
+        positionTooltip(target);
+        // ensure visible
+        clearTimeout(hideTimeout);
+    }
+
+    function hideMetricTooltip(){
+        activeTarget = null;
+        tip.classList.remove('visible');
+        tip.classList.add('hidden');
+    }
+
+    function positionTooltip(target){
+        if (!target) return;
+        const rect = target.getBoundingClientRect();
+        tip.style.maxWidth = Math.min(420, window.innerWidth - 32) + 'px';
+        tip.style.left = '0px'; tip.style.top = '0px';
+        tip.style.display = 'block';
+        // compute after it is displayed to get size
+        const tw = tip.offsetWidth;
+        const th = tip.offsetHeight;
+        // center above the icon by default
+        let left = rect.left + rect.width/2 - tw/2;
+        left = Math.max(8, Math.min(left, window.innerWidth - tw - 8));
+        let top = rect.top - th - 10;
+        // if not enough space above, place below
+        if (top < 8) top = rect.bottom + 10;
+        tip.style.left = Math.round(left) + 'px';
+        tip.style.top = Math.round(top) + 'px';
+    }
+
+    // delegate events
+    document.addEventListener('mouseover', (e)=>{
+        const t = e.target.closest && e.target.closest('.metric-info');
+        if (t) {
+            showMetricTooltip(t);
+        }
+    });
+    document.addEventListener('mouseout', (e)=>{
+        const t = e.target.closest && e.target.closest('.metric-info');
+        if (t) {
+            // small delay to avoid flicker
+            hideTimeout = setTimeout(hideMetricTooltip, 80);
+        }
+    });
+    // reposition on scroll/resize when visible
+    window.addEventListener('scroll', ()=>{ if (activeTarget) positionTooltip(activeTarget); }, true);
+    window.addEventListener('resize', ()=>{ if (activeTarget) positionTooltip(activeTarget); });
+})();
