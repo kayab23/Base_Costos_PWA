@@ -1637,7 +1637,8 @@ function renderVendedorTable(vendedores){
         const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
         (vendedores || []).forEach(v=>{
             const tr = document.createElement('tr');
-            tr.innerHTML = `<td>${esc(v.vendedor)}</td><td>${v.quotes_count||0}</td><td>${v.closed_count||0}</td><td>${v.total_value?fmt(v.total_value):'-'}</td><td>${v.closed_total?fmt(v.closed_total):'-'}</td><td>${v.avg_discount_percent!=null?v.avg_discount_percent+'%':'-'}</td><td>${v.avg_margin_percent!=null?v.avg_margin_percent+'%':'-'}</td>`;
+            const closeRate = (v.quotes_count && v.closed_count) ? Math.round((v.closed_count / v.quotes_count)*10000)/100 : null;
+            tr.innerHTML = `<td>${esc(v.vendedor)}</td><td>${v.quotes_count||0}</td><td>${v.closed_count||0}</td><td>${v.total_value?fmt(v.total_value):'-'}</td><td>${v.closed_total?fmt(v.closed_total):'-'}</td><td>${closeRate!=null?closeRate+'%':'-'}</td><td>${v.avg_discount_percent!=null?v.avg_discount_percent+'%':'-'}</td><td>${v.avg_margin_percent!=null?v.avg_margin_percent+'%':'-'}</td>`;
             tbody.appendChild(tr);
         });
         if (typeof window.jQuery !== 'undefined' && window.jQuery.fn && window.jQuery.fn.dataTable) {
@@ -1649,6 +1650,52 @@ function renderVendedorTable(vendedores){
         }
     }catch(err){ console.error('renderVendedorTable error', err); tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);">No fue posible renderizar resumen por vendedor.</td></tr>'; }
 }
+
+// Lightweight client-side table search and sort (no DataTables)
+function _initVendedorTableHelpers(){
+    const table = document.getElementById('vendedorTable');
+    if (!table) return;
+    const tbody = table.querySelector('tbody');
+    const headers = table.querySelectorAll('th');
+    // Sorting
+    headers.forEach((th, idx)=>{
+        const sortType = th.getAttribute('data-sort') || 'string';
+        th.style.cursor = 'pointer';
+        th.addEventListener('click', ()=>{
+            const rows = Array.from(tbody.querySelectorAll('tr'));
+            const dir = th.getAttribute('data-dir') === 'asc' ? 'desc' : 'asc';
+            th.setAttribute('data-dir', dir);
+            rows.sort((a,b)=>{
+                const aText = a.children[idx].innerText.trim();
+                const bText = b.children[idx].innerText.trim();
+                if (sortType === 'number'){
+                    const an = parseFloat(aText.replace(/[^0-9.-]+/g,'')) || 0;
+                    const bn = parseFloat(bText.replace(/[^0-9.-]+/g,'')) || 0;
+                    return dir === 'asc' ? an - bn : bn - an;
+                }
+                return dir === 'asc' ? aText.localeCompare(bText) : bText.localeCompare(aText);
+            });
+            // reattach
+            rows.forEach(r=>tbody.appendChild(r));
+        });
+    });
+    // Search
+    const search = document.getElementById('vendedor-search');
+    if (search){
+        let last = '';
+        search.addEventListener('input', ()=>{
+            const q = search.value.trim().toLowerCase();
+            if (q === last) return; last = q;
+            Array.from(tbody.querySelectorAll('tr')).forEach(tr=>{
+                const name = tr.children[0].innerText.toLowerCase();
+                tr.style.display = name.indexOf(q) === -1 ? 'none' : '';
+            });
+        });
+    }
+}
+
+// Initialize helpers once DOM is ready
+document.addEventListener('DOMContentLoaded', _initVendedorTableHelpers);
 
 async function refreshDashboard(){
     try{
