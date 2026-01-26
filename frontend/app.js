@@ -1628,6 +1628,28 @@ function renderTable(rows){
     }
 }
 
+function renderVendedorTable(vendedores){
+    const tbody = document.querySelector('#vendedorTable tbody');
+    if (!tbody) return;
+    try{
+        tbody.innerHTML = '';
+        const fmt = (v) => new Intl.NumberFormat('es-MX',{style:'currency',currency:'MXN'}).format(v);
+        const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+        (vendedores || []).forEach(v=>{
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${esc(v.vendedor)}</td><td>${v.quotes_count||0}</td><td>${v.closed_count||0}</td><td>${v.total_value?fmt(v.total_value):'-'}</td><td>${v.closed_total?fmt(v.closed_total):'-'}</td><td>${v.avg_discount_percent!=null?v.avg_discount_percent+'%':'-'}</td><td>${v.avg_margin_percent!=null?v.avg_margin_percent+'%':'-'}</td>`;
+            tbody.appendChild(tr);
+        });
+        if (typeof window.jQuery !== 'undefined' && window.jQuery.fn && window.jQuery.fn.dataTable) {
+            try{
+                if (!window.jQuery.fn.dataTable.isDataTable('#vendedorTable')) {
+                    window.jQuery('#vendedorTable').DataTable();
+                }
+            }catch(e){ console.warn('vendedor DataTable init failed', e); }
+        }
+    }catch(err){ console.error('renderVendedorTable error', err); tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);">No fue posible renderizar resumen por vendedor.</td></tr>'; }
+}
+
 async function refreshDashboard(){
     try{
         const period = document.getElementById('dash-period')?.value || '30';
@@ -1637,6 +1659,7 @@ async function refreshDashboard(){
         renderSummary(m);
         renderCharts(m);
         renderTable(m.recent_quotes || []);
+        renderVendedorTable(m.by_vendedor || []);
         if (but) but.disabled = false;
     }catch(e){ console.error('refreshDashboard', e); showToast('Error cargando métricas','error'); const but=document.getElementById('dash-refresh'); if(but) but.disabled=false; }
 }
