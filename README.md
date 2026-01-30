@@ -96,6 +96,16 @@ pytest -q tests/test_e2e_discount.py
 C:/Users/FernandoOlveraRendon/Documents/Base_Costos/.venv/Scripts/python.exe scripts/validate_pdf.py
 ```
 
+### Limpieza de artefactos de prueba
+
+Se añadió el script `tools/cleanup_repo.ps1` para eliminar archivos temporales y respuestas de pruebas generadas localmente. Ejecuta desde la raíz del repo:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\cleanup_repo.ps1
+```
+
+El script elimina archivos conocidos de salida de pruebas y `__pycache__` y no borra la carpeta `.venv` ni el código fuente. Revisa la salida antes de hacer commit.
+
 ## Uso Rápido
 
 **1. Calcular Landed Costs:**
