@@ -4,12 +4,25 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+      args:
+        SKIP_ODBC: "1"
     container_name: backend
     ports:
       - "8000:8000"
     env_file:
       - .env
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=production
+      - UVICORN_WORKERS=4
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     depends_on:
+      - redis
       - prometheus
   frontend:
     image: python:3.11-slim
@@ -19,7 +32,9 @@ services:
       - ./frontend:/app/frontend
     command: python -m http.server 5173 --directory frontend
     ports:
-      - "5173:5173"
+      # Host port changed to avoid conflict with local dev tools.
+      # If 5173 is free on your machine you can map "5173:5173" instead.
+      - "5174:5173"
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
@@ -36,3 +51,14 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     depends_on:
       - prometheus
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

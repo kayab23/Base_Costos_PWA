@@ -88,6 +88,7 @@ const selectors = {
     password: document.getElementById('password'),
     status: document.getElementById('status-msg'),
     userRole: document.getElementById('user-role'), // Nuevo: elemento para mostrar rol
+    sseStatus: document.getElementById('sse-status'),
     connectBtn: document.getElementById('connect-btn'),
     landedTable: document.querySelector('#landed-table tbody'),
     skuList: document.getElementById('sku-list'),
@@ -131,8 +132,69 @@ function initLoginOnlyView() {
 // Ejecutar inicialización de vista al cargar el script
 initLoginOnlyView();
 
+// Restaurar UI según sesión existente una vez cargado el DOM
+document.addEventListener('DOMContentLoaded', () => {
+    try {
+        if (state.auth && state.userRole) {
+            // Mostrar secciones antes de aplicar reglas por rol
+            document.querySelectorAll('.card').forEach(card => card.style.display = '');
+            if (selectors.userRole) {
+                selectors.userRole.textContent = `Rol: ${state.userRole}`;
+                selectors.userRole.style.display = 'block';
+            }
+            // Ejecutar updateUIForRole una vez esté definida (pequeño retardo por seguridad)
+            setTimeout(() => {
+                if (typeof updateUIForRole === 'function') updateUIForRole();
+            }, 120);
+        }
+    } catch (e) {
+        console.error('Error restoring UI for existing session', e);
+    }
+});
+
 async function apiFetch(path, options = {}) {
     // No lanzar aquí si no hay sesión: permitir que endpoints públicos funcionen
+    // Inicializar conexión SSE para notificaciones en tiempo real
+    function initSSE() {
+        if (!state.baseUrl) return;
+        try {
+            const url = `${state.baseUrl.replace(/^http:\/\//, 'http://')}/autorizaciones/events`;
+            const es = new EventSource(url);
+            es.onopen = () => {
+                console.info('SSE conectado');
+                if (selectors.sseStatus) { selectors.sseStatus.style.display = 'block'; selectors.sseStatus.textContent = 'SSE: conectado'; selectors.sseStatus.style.color = '#00ff88'; }
+            };
+            es.onerror = (e) => {
+                console.warn('SSE error', e);
+                if (selectors.sseStatus) { selectors.sseStatus.style.display = 'block'; selectors.sseStatus.textContent = 'SSE: error'; selectors.sseStatus.style.color = '#ff6b6b'; }
+            };
+            es.onclose = () => {
+                if (selectors.sseStatus) { selectors.sseStatus.style.display = 'block'; selectors.sseStatus.textContent = 'SSE: desconectado'; selectors.sseStatus.style.color = '#ffd166'; }
+            };
+            es.onmessage = (e) => {
+                try {
+                    const ev = JSON.parse(e.data);
+                    console.info('SSE evento recibido', ev);
+                    // Actualizar tablas relevantes según tipo de evento
+                    if (ev.action === 'created') {
+                        // Nuevo pedido creado: refrescar pendientes y mis-solicitudes
+                        if (typeof loadPendientes === 'function') loadPendientes();
+                        if (typeof loadMisSolicitudes === 'function') loadMisSolicitudes();
+                    } else if (ev.action === 'approved' || ev.action === 'rejected') {
+                        if (typeof loadPendientes === 'function') loadPendientes();
+                        if (typeof loadProcesadas === 'function') loadProcesadas();
+                        if (typeof loadMisSolicitudes === 'function') loadMisSolicitudes();
+                    }
+                } catch (err) {
+                    console.error('Error procesando evento SSE', err);
+                }
+            };
+            // Guardar reference to close later if needed
+            state._eventSource = es;
+        } catch (e) {
+            console.error('No se pudo inicializar SSE', e);
+        }
+    }
     const headers = {
         'Content-Type': 'application/json',
         ...(options.headers || {}),
@@ -152,7 +214,12 @@ async function apiFetch(path, options = {}) {
                 const contentType = response.headers.get('content-type') || '';
                 if (contentType.includes('application/json')) {
                     const err = await response.json();
-                    detail = err.detail || JSON.stringify(err);
+                    // Evitar que objetos se conviertan a "[object Object]"
+                    if (err && typeof err.detail !== 'undefined') {
+                        detail = typeof err.detail === 'object' ? JSON.stringify(err.detail) : String(err.detail);
+                    } else {
+                        detail = JSON.stringify(err);
+                    }
                 } else {
                     detail = await response.text();
                 }
@@ -242,6 +309,8 @@ selectors.connectBtn.addEventListener('click', async () => {
 
         updateUIForRole();
         showToast('Inicio de sesión exitoso.', 'success');
+        // Inicializar SSE para notificaciones en tiempo real
+        initSSE();
         // autenticación exitosa
         if (state.userRole === 'Vendedor') {
             const aprobacionesSection = document.getElementById('procesadas-section');
@@ -302,7 +371,9 @@ async function loadLanded() {
             .map(row => {
                 const sku = row.querySelector('.sku-input').value.trim();
                 const cantidad = parseInt(row.querySelector('.cantidad-input')?.value) || 1;
-                return { sku, cantidad };
+                // Use per-SKU transporte select; default to 'maritimo' if missing
+                const transporteSel = row.querySelector('.transporte-select')?.value || 'maritimo';
+                return { sku, cantidad, transporte: transporteSel };
             })
             .filter(q => q.sku);
 
@@ -318,6 +389,7 @@ async function loadLanded() {
         const promises = skuQueries.map(query => {
             const params = new URLSearchParams();
             params.append('sku', query.sku);
+            if (query.transporte) params.append('transporte', query.transporte);
             return apiFetch(`/pricing/listas?${params.toString()}`);
         });
 
@@ -325,7 +397,8 @@ async function loadLanded() {
         // Emparejar cantidad con cada resultado
         let allData = results.map((data, i) => {
             const cantidad = skuQueries[i].cantidad;
-            return data.map(row => ({ ...row, cantidad }));
+            const transporte = skuQueries[i].transporte;
+            return data.map(row => ({ ...row, cantidad, transporte }));
         }).flat();
 
         // --- Restaurar montos propuestos previos por SKU ---
@@ -471,8 +544,10 @@ function showProductDetails(skus) {
         .filter(Boolean);
     
     if (productos.length > 0) {
+        const role = state.userRole || 'Vendedor';
         selectors.productDetails.innerHTML = productos
-            .map(producto => `
+            .map(producto => {
+                return `
                 <div class="product-detail-card">
                     <div class="product-detail-header">${producto.sku}</div>
                     <div class="details-grid">
@@ -492,17 +567,20 @@ function showProductDetails(skus) {
                             <span class="detail-label">Categoría:</span>
                             <span class="detail-value">${producto.categoria || '-'}</span>
                         </div>
+                        ${role !== 'Vendedor' ? `
                         <div class="detail-item">
                             <span class="detail-label">Moneda Base:</span>
                             <span class="detail-value">${producto.moneda_base || '-'}</span>
                         </div>
+                        ` : ''}
                         <div class="detail-item">
                             <span class="detail-label">Activo:</span>
                             <span class="detail-value">${producto.activo ? 'Sí' : 'No'}</span>
                         </div>
                     </div>
                 </div>
-            `)
+            `;
+            })
             .join('');
         selectors.productDetailsCard.style.display = 'block';
     } else {
@@ -519,6 +597,10 @@ function addSkuInput() {
     newRow.className = 'sku-input-row';
     newRow.innerHTML = `
         <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
+        <select class="transporte-select">
+            <option value="maritimo">Marítimo</option>
+            <option value="aereo">Aéreo</option>
+        </select>
         <div class="cantidad-stepper">
             <button type="button" class="stepper-btn stepper-minus">−</button>
             <input type="number" class="cantidad-input" min="1" value="1" style="width:60px" placeholder="Cantidad">
@@ -581,6 +663,10 @@ function clearAllSkus() {
     selectors.skuInputsContainer.innerHTML = `
         <div class="sku-input-row">
             <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
+            <select class="transporte-select">
+                <option value="maritimo">Marítimo</option>
+                <option value="aereo">Aéreo</option>
+            </select>
             <div class="cantidad-stepper">
                 <button type="button" class="stepper-btn stepper-minus">−</button>
                 <input type="number" class="cantidad-input" min="1" value="1" style="width:60px" placeholder="Cantidad">
@@ -613,17 +699,19 @@ function formatPercentage(value) {
 
 // Nueva función: Actualizar UI según rol del usuario
 function updateUIForRole() {
-    const role = state.userRole || 'Vendedor';
+    const rawRole = state.userRole || 'Vendedor';
+    const role = String(rawRole).toLowerCase();
+    const isVendedor = role === 'vendedor';
     const adminGerenCols = document.querySelectorAll('.admin-gerencia');
-    
+
     // Mostrar columnas de costos para todos EXCEPTO Vendedor
-    if (role === 'Vendedor') {
+    if (isVendedor) {
         adminGerenCols.forEach(col => col.style.display = 'none');
     } else {
         adminGerenCols.forEach(col => col.style.display = 'table-cell');
     }
-    
-    // Configurar UI según rol
+
+    // Configurar UI según rol (comparaciones en minúscula)
     const downloadBtn = document.getElementById('download-excel');
     const sectionTitle = document.getElementById('section-title');
     const sectionDesc = document.getElementById('section-description');
@@ -632,77 +720,72 @@ function updateUIForRole() {
     const pendientesSection = document.getElementById('pendientes-section');
     const procesadasSection = document.getElementById('procesadas-section');
 
-    if (role === 'Vendedor') {
+    if (isVendedor) {
         if (sectionTitle) sectionTitle.textContent = 'Mi Lista de Precios';
-        if (sectionDesc) sectionDesc.textContent = 'Precios autorizados: 20% descuento desde Precio Máximo';
-        // Ocultar y deshabilitar botón de descarga Excel
-        if (downloadBtn) {
-            downloadBtn.style.display = 'none';
-            downloadBtn.disabled = true;
-        }
-        // Mostrar sección de solicitud de autorización
+        if (sectionDesc) { sectionDesc.textContent = ''; sectionDesc.style.display = 'none'; }
+        if (downloadBtn) { downloadBtn.style.display = 'none'; downloadBtn.disabled = true; }
         if (solicitarAutSection) solicitarAutSection.style.display = 'block';
         if (misSolicitudesSection) misSolicitudesSection.style.display = 'block';
         if (pendientesSection) pendientesSection.style.display = 'none';
         loadMisSolicitudes();
-    } else if (role === 'Gerencia_Comercial') {
-        // Mostrar botón para otros roles
-        if (downloadBtn) {
-            downloadBtn.style.display = '';
-            downloadBtn.disabled = false;
-        }
+        // Ocultar panel de métricas y cotizaciones
+        try {
+            const dashboardSection = document.getElementById('dashboard-section');
+            if (dashboardSection) dashboardSection.style.display = 'none';
+            const cotizacionesSection = document.getElementById('cotizaciones-section');
+            if (cotizacionesSection) cotizacionesSection.style.display = 'none';
+        } catch (e) { console.error('Error hiding vendor-only sections', e); }
+        return;
+    }
+
+    // Roles distintos a vendedor
+    if (role === 'gerencia_comercial') {
+        if (downloadBtn) { downloadBtn.style.display = ''; downloadBtn.disabled = false; }
         if (sectionTitle) sectionTitle.textContent = 'Lista de Precios Gerencia Comercial';
-        if (sectionDesc) sectionDesc.textContent = 'Costos completos y precios autorizados (25% descuento desde Precio Máximo)';
+        if (sectionDesc) { sectionDesc.textContent = 'Costos completos y precios autorizados (25% descuento desde Precio Máximo)'; sectionDesc.style.display = ''; }
         if (solicitarAutSection) solicitarAutSection.style.display = 'block';
         if (misSolicitudesSection) misSolicitudesSection.style.display = 'block';
         if (pendientesSection) pendientesSection.style.display = 'block';
         if (procesadasSection) procesadasSection.style.display = 'block';
-        loadMisSolicitudes();
-        loadPendientes();
-        loadProcesadas();
-    } else if (role === 'Subdireccion') {
+        loadMisSolicitudes(); loadPendientes(); loadProcesadas();
+    } else if (role === 'subdireccion') {
         if (sectionTitle) sectionTitle.textContent = 'Lista de Precios Subdirección';
-        if (sectionDesc) sectionDesc.textContent = 'Costos completos y precios autorizados (30% descuento)';
+        if (sectionDesc) { sectionDesc.textContent = 'Costos completos y precios autorizados (30% descuento)'; sectionDesc.style.display = ''; }
         if (solicitarAutSection) solicitarAutSection.style.display = 'block';
         if (misSolicitudesSection) misSolicitudesSection.style.display = 'block';
         if (pendientesSection) pendientesSection.style.display = 'block';
         if (procesadasSection) procesadasSection.style.display = 'block';
-        loadMisSolicitudes();
-        loadPendientes();
-        loadProcesadas();
-    } else if (role === 'Direccion') {
+        loadMisSolicitudes(); loadPendientes(); loadProcesadas();
+    } else if (role === 'direccion') {
         if (sectionTitle) sectionTitle.textContent = 'Lista de Precios Dirección';
-        if (sectionDesc) sectionDesc.textContent = 'Costos completos y precios autorizados (35% descuento)';
+        if (sectionDesc) { sectionDesc.textContent = 'Costos completos y precios autorizados (35% descuento)'; sectionDesc.style.display = ''; }
         if (solicitarAutSection) solicitarAutSection.style.display = 'none';
         if (misSolicitudesSection) misSolicitudesSection.style.display = 'none';
         if (pendientesSection) pendientesSection.style.display = 'block';
         if (procesadasSection) procesadasSection.style.display = 'block';
-        loadPendientes();
-        loadProcesadas();
-    } else if (role === 'Gerencia') {
+        loadPendientes(); loadProcesadas();
+    } else if (role === 'gerencia') {
         if (sectionTitle) sectionTitle.textContent = 'Lista de Precios Gerencia';
-        if (sectionDesc) sectionDesc.textContent = 'Costos completos y vista de todas las autorizaciones';
+        if (sectionDesc) { sectionDesc.textContent = 'Costos completos y vista de todas las autorizaciones'; sectionDesc.style.display = ''; }
         if (solicitarAutSection) solicitarAutSection.style.display = 'none';
         if (misSolicitudesSection) misSolicitudesSection.style.display = 'none';
         if (pendientesSection) pendientesSection.style.display = 'block';
         if (procesadasSection) procesadasSection.style.display = 'block';
-        loadPendientes();
-        loadProcesadas();
+        loadPendientes(); loadProcesadas();
     } else {
-        // Admin puede ver todo
+        // Admin u otros
         if (sectionTitle) sectionTitle.textContent = 'Lista de Precios - Vista Administrativa';
-        if (sectionDesc) sectionDesc.textContent = 'Todas las listas de precios y costos completos';
+        if (sectionDesc) { sectionDesc.textContent = 'Todas las listas de precios y costos completos'; sectionDesc.style.display = ''; }
         if (solicitarAutSection) solicitarAutSection.style.display = 'none';
         if (misSolicitudesSection) misSolicitudesSection.style.display = 'none';
         if (pendientesSection) pendientesSection.style.display = 'block';
         if (procesadasSection) procesadasSection.style.display = 'block';
-        loadPendientes();
-        loadProcesadas();
+        loadPendientes(); loadProcesadas();
     }
     // Mostrar/ocultar dashboard integrado según rol
     try {
         const dashboardSection = document.getElementById('dashboard-section');
-        const allowedRoles = ['Vendedor','Gerencia_Comercial','Gerencia','Subdireccion','Direccion','Admin'];
+        const allowedRoles = ['vendedor','gerencia_comercial','gerencia','subdireccion','direccion','admin'];
         if (dashboardSection) {
             if (allowedRoles.includes(role)) {
                 dashboardSection.style.display = 'block';
@@ -1073,13 +1156,35 @@ document.getElementById('solicitud-form')?.addEventListener('submit', async (e) 
     if (submitBtn.disabled) return;
     submitBtn.disabled = true;
     
+        // Obtener y validar campos del formulario; incluir transporte (requerido por backend)
+        const skuVal = document.getElementById('sol-sku').value.trim();
+        const precioRaw = document.getElementById('sol-precio').value;
+        const precioNum = parseFloat(String(precioRaw).replace(',', '.'));
+        if (isNaN(precioNum)) {
+            statusEl.textContent = '❌ Precio propuesto inválido.';
+            statusEl.style.color = '#f44336';
+            submitBtn.disabled = false;
+            return;
+        }
+
+        // Determinar transporte: preferir campo del formulario si existe, sino usar contexto pendiente o búsqueda en rowsCotizacion
+        let transporteVal = (document.getElementById('sol-transporte')?.value || '').trim();
+        if (!transporteVal) {
+            if (pendingAuthRequest && pendingAuthRequest.row && pendingAuthRequest.row.transporte) transporteVal = pendingAuthRequest.row.transporte;
+            else {
+                const found = (state.rowsCotizacion || []).find(r => r.sku === skuVal);
+                transporteVal = found?.transporte || 'maritimo';
+            }
+        }
+
         const data = {
-        sku: document.getElementById('sol-sku').value.trim(),
-        precio_propuesto: parseFloat(document.getElementById('sol-precio').value),
-        cliente: document.getElementById('sol-cliente').value.trim() || null,
-        cantidad: parseInt(document.getElementById('sol-cantidad').value) || null,
-        justificacion: document.getElementById('sol-justificacion').value.trim()
-    };
+            sku: skuVal,
+            transporte: transporteVal,
+            precio_propuesto: precioNum,
+            cliente: document.getElementById('sol-cliente').value.trim() || null,
+            cantidad: parseInt(document.getElementById('sol-cantidad').value) || null,
+            justificacion: document.getElementById('sol-justificacion').value.trim()
+        };
     
     try {
         statusEl.textContent = 'Enviando solicitud...';
@@ -1299,6 +1404,9 @@ async function aprobarSolicitud(id) {
         alert('✅ Solicitud aprobada');
         loadPendientes();
         loadProcesadas();
+        // Actualizar también la lista "Mis Solicitudes" por si el solicitante
+        // está en la misma sesión o para reflejar cambios en la UI.
+        if (typeof loadMisSolicitudes === 'function') loadMisSolicitudes();
     } catch (error) {
         alert(`❌ Error: ${error.message}`);
     }
@@ -1317,6 +1425,8 @@ async function rechazarSolicitud(id) {
         alert('❌ Solicitud rechazada');
         loadPendientes();
         loadProcesadas();
+        // Actualizar lista de usuario solicitante
+        if (typeof loadMisSolicitudes === 'function') loadMisSolicitudes();
     } catch (error) {
         alert(`❌ Error: ${error.message}`);
     }

@@ -37,6 +37,7 @@
                 <button id="logout-btn" style="display:none; margin-left:10px;">Cerrar sesión</button>
                 <p id="status-msg" class="status">Sin conexión</p>
                 <p id="user-role" class="status" style="display:none; color: #00ff88; font-weight: 600;"></p>
+                <p id="sse-status" class="status" style="display:none; color:#ffd166; font-weight:600;">SSE: desconectado</p>
             </div>
         </section>
 
@@ -58,9 +59,14 @@
                     <div style="display: flex; align-items: flex-end; gap: 1.5rem; flex-wrap: wrap;">
                         <div>
                             <h4 style="margin-bottom: 0.5rem;">SKUs a cotizar:</h4>
+                            <!-- Transporte por SKU solo (select global eliminado) -->
                             <div id="sku-inputs-container" class="sku-inputs">
                                 <div class="sku-input-row">
                                     <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
+                                    <select class="transporte-select">
+                                        <option value="maritimo">Marítimo</option>
+                                        <option value="aereo">Aéreo</option>
+                                    </select>
                                     <div class="cantidad-stepper">
                                         <button type="button" class="stepper-btn stepper-minus">−</button>
                                         <input type="number" class="cantidad-input" placeholder="Cantidad" min="1" value="1" style="width:60px;">
@@ -70,6 +76,8 @@
                                 </div>
                             </div>
                             <datalist id="sku-list"></datalist>
+                            <datalist id="clientes-list"></datalist>
+                            <datalist id="vendedores-list"></datalist>
                         </div>
                         <div class="button-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
                             <button class="ghost" data-action="load-landed">Consultar</button>
@@ -279,13 +287,15 @@
             <h4 style="margin-top:12px">Resumen por Vendedor</h4>
             <div style="display:flex;gap:8px;align-items:center;margin-top:8px;margin-bottom:8px;">
                 <input id="vendedor-search" placeholder="Buscar vendedor..." style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:var(--text);" />
+                <button id="vendedor-export" class="ghost" style="white-space:nowrap;">Exportar CSV</button>
                 <small style="color:var(--muted)">Clic en encabezado para ordenar</small>
             </div>
             <div class="table-wrapper">
                 <table id="vendedorTable" class="display" style="width:100%">
                     <thead>
                         <tr>
-                            <th data-sort="string">Vendedor</th>
+                                    <th data-sort="none">Trend</th>
+                                    <th data-sort="string">Vendedor</th>
                             <th data-sort="number">Cotizaciones</th>
                             <th data-sort="number">Cerradas</th>
                             <th data-sort="number">Ventas Totales</th>
@@ -297,6 +307,18 @@
                     </thead>
                     <tbody></tbody>
                 </table>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px;">
+                <button id="vendedor-prev" class="ghost">Anterior</button>
+                <span id="vendedor-page" style="color:var(--muted)">1</span>
+                <button id="vendedor-next" class="ghost">Siguiente</button>
+                <label style="color:var(--muted);margin-left:12px">Por página:
+                    <select id="vendedor-pagesize" style="margin-left:6px;padding:6px;border-radius:6px;background:transparent;color:var(--text)">
+                        <option>10</option>
+                        <option selected>20</option>
+                        <option>50</option>
+                    </select>
+                </label>
             </div>
             <h4 style="margin-top:12px">Cotizaciones Recientes</h4>
             <div class="table-wrapper"><table id="cotTable" class="display" style="width:100%"><thead><tr><th>Folio</th><th>Fecha</th><th>Cliente</th><th>Vendedor</th><th>Valor</th><th>Estado</th></tr></thead><tbody></tbody></table></div>

@@ -1,0 +1,16 @@
+[Unit]
+Description=Base Costos docker-compose
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/srv/base_costos
+ExecStart=/usr/local/bin/docker-compose -f docker-compose.prod.yml up -d --remove-orphans
+ExecStop=/usr/local/bin/docker-compose -f docker-compose.prod.yml down
+TimeoutStartSec=300
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target

@@ -35,7 +35,11 @@ app.add_middleware(
 )
 
 # Servir archivos estáticos del frontend (dashboard, index, assets)
-app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+import os
+if os.path.isdir("frontend"):
+    app.mount("/frontend", StaticFiles(directory="frontend"), name="frontend")
+else:
+    logger.warning("Frontend directory not found; skipping StaticFiles mount in container")
 
 # Registrar routers de cada módulo funcional
 app.include_router(auth.router)
