@@ -13,7 +13,10 @@ def _format_currency(v: float) -> str:
 
 
 @router.get("/metrics")
-def _compute_metrics(periodDays: int = 30, vendedor: Optional[str] = 'all'):
+def metrics(periodDays: int = Query(30, alias='periodDays'), vendedor: Optional[str] = Query('all')):
+    """Aggregate simple KPIs from dbo.cotizaciones for the requested period.
+    This implementation parses stored JSON payloads and computes totals client-side.
+    """
     cutoff = datetime.utcnow() - timedelta(days=periodDays)
     with connection_scope() as conn:
         cur = conn.cursor()
@@ -39,6 +42,7 @@ def _compute_metrics(periodDays: int = 30, vendedor: Optional[str] = 'all'):
     discounts = []
 
     for r in rows:
+        # cursor description: (id, cliente, vendedor, numero_cliente, numero_vendedor, fecha_cotizacion, payload_json, created_at)
         try:
             payload = json.loads(r[6]) if r[6] else {}
         except Exception:
@@ -66,7 +70,7 @@ def _compute_metrics(periodDays: int = 30, vendedor: Optional[str] = 'all'):
                 item_discounts.append(discount_pct)
         total_sales += quote_total
         quote_count += 1
-
+        # sales by day
         fecha = r[5] if r[5] else r[7]
         try:
             fecha_dt = fecha if isinstance(fecha, datetime) else datetime.fromisoformat(str(fecha))
@@ -75,27 +79,24 @@ def _compute_metrics(periodDays: int = 30, vendedor: Optional[str] = 'all'):
         day = fecha_dt.date().isoformat()
         sales_by_day.setdefault(day, 0.0)
         sales_by_day[day] += quote_total
-
+        # client aggregation
         client_name = r[1] or 'Desconocido'
         client_agg.setdefault(client_name, 0.0)
         client_agg[client_name] += quote_total
-
+        # vendedor aggregation
         vendedor_name = r[2] or 'Sin vendedor'
-        v = vendedor_agg.setdefault(vendedor_name, {'quotes_count':0, 'closed_count':0, 'closed_total':0.0, 'total_value':0.0, 'discounts':[], 'margins':[], 'sales_by_day':{}})
+        v = vendedor_agg.setdefault(vendedor_name, {'quotes_count':0, 'closed_count':0, 'closed_total':0.0, 'total_value':0.0, 'discounts':[], 'margins':[]})
         v['quotes_count'] += 1
         v['total_value'] += quote_total
-        # accumulate per-vendedor sales by day
-        v['sales_by_day'].setdefault(day, 0.0)
-        v['sales_by_day'][day] += quote_total
-
+        # consider closed if payload.estado indicates closed/won
         estado = (payload.get('estado') or '').lower() if isinstance(payload, dict) else ''
         if estado in ('cerrada','cerrado','ganada','ganado','won','closed'):
             v['closed_count'] += 1
             v['closed_total'] += quote_total
-
+        # aggregate discounts and margins per vendedor
         if item_discounts:
             v['discounts'].extend(item_discounts)
-
+        # margins: try to compute if items have costo_base
         for it in items:
             try:
                 monto = float(it.get('monto_propuesto', 0) or 0)
@@ -105,7 +106,7 @@ def _compute_metrics(periodDays: int = 30, vendedor: Optional[str] = 'all'):
                     v['margins'].append(margin_pct)
             except Exception:
                 pass
-
+        # recent quotes
         recent_quotes.append({
             'id': r[0],
             'folio': (r[3] or r[4] or ''),
@@ -119,20 +120,16 @@ def _compute_metrics(periodDays: int = 30, vendedor: Optional[str] = 'all'):
         if item_discounts:
             discounts.extend(item_discounts)
 
-    # date series covering full range
-    today = datetime.utcnow().date()
-    dates = [(today - timedelta(days=i)).isoformat() for i in range(periodDays-1, -1, -1)]
-    # structured outputs
-    sales_by_day_list = [{'date': d, 'amount': sales_by_day.get(d, 0.0)} for d in dates]
+    # Prepare structured response
+    sales_by_day_list = [{'date': d, 'amount': a} for d, a in sorted(sales_by_day.items())]
     top_clients = [{'name': k, 'amount': v} for k, v in sorted(client_agg.items(), key=lambda x: x[1], reverse=True)[:10]]
     avg_discount = (sum(discounts) / len(discounts)) if discounts else None
 
+    # Prepare vendedor summary
     by_vendedor = []
     for vn, info in sorted(vendedor_agg.items(), key=lambda x: x[1]['total_value'], reverse=True):
         avg_disc = (sum(info['discounts']) / len(info['discounts'])) if info['discounts'] else None
         avg_margin = (sum(info['margins']) / len(info['margins'])) if info['margins'] else None
-        # build series aligned with dates
-        series = [ info['sales_by_day'].get(d, 0.0) for d in dates ]
         by_vendedor.append({
             'vendedor': vn,
             'quotes_count': info['quotes_count'],
@@ -140,13 +137,11 @@ def _compute_metrics(periodDays: int = 30, vendedor: Optional[str] = 'all'):
             'closed_total': info['closed_total'],
             'total_value': info['total_value'],
             'avg_discount_percent': round(avg_disc,2) if avg_disc is not None else None,
-            'avg_margin_percent': round(avg_margin,2) if avg_margin is not None else None,
-            'series': series
+            'avg_margin_percent': round(avg_margin,2) if avg_margin is not None else None
         })
 
     resp = {
         'period_days': periodDays,
-        'dates': dates,
         'total_sales': total_sales,
         'total_sales_formatted': _format_currency(total_sales),
         'quote_count': quote_count,
@@ -158,20 +153,3 @@ def _compute_metrics(periodDays: int = 30, vendedor: Optional[str] = 'all'):
         'recent_quotes': recent_quotes[:20]
     }
     return resp
-
-
-@router.get("/metrics")
-def metrics(periodDays: int = Query(30, alias='periodDays'), vendedor: Optional[str] = Query('all')):
-    return _compute_metrics(periodDays, vendedor)
-
-
-@router.get('/by-vendedor')
-def by_vendedor(periodDays: int = Query(30), page: int = Query(1), pageSize: int = Query(20), vendedor: Optional[str] = Query('all')):
-    """Paginated list of vendedor aggregates. Returns items and total count."""
-    data = _compute_metrics(periodDays, vendedor)
-    items = data.get('by_vendedor', [])
-    total = len(items)
-    # simple pagination
-    start = max(0, (page-1)*pageSize)
-    end = start + pageSize
-    return { 'page': page, 'pageSize': pageSize, 'total': total, 'items': items[start:end] }

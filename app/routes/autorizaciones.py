@@ -23,8 +23,6 @@ ENDPOINTS:
 - PUT /autorizaciones/{id}/rechazar: Rechaza solicitud (niveles superiores)
 """
 from fastapi import APIRouter, Depends, HTTPException
-import asyncio
-from ..events import publish_event, sse_response
 from typing import List, Optional
 from .. import schemas, db
 from ..auth import get_current_user
@@ -114,69 +112,39 @@ def determinar_autorizador(precio_propuesto: float, sku: str, transporte: str, n
     # va al siguiente nivel jerárquico, sin importar qué tan bajo sea
     
     if nivel_solicitante == 'Vendedor':
-        # Si el precio propuesto está dentro del rango del vendedor → no necesita autorización
-        if precio_propuesto >= precio_vendedor_min:
+        # Si el precio propuesto está por debajo de su mínimo, va a Gerencia_Comercial
+        if precio_propuesto < precio_vendedor_min:
+            return 'Gerencia_Comercial', precio_vendedor_min
+        else:
             logger.info(f"Solicitud innecesaria: usuario_nivel=Vendedor, sku={sku}, propuesto={precio_propuesto}, min={precio_vendedor_min}")
             raise HTTPException(
                 status_code=400,
                 detail=f"El precio propuesto (${precio_propuesto:,.2f}) esta dentro de tu rango autorizado (≥${precio_vendedor_min:,.2f}). No necesitas autorizacion.",
                 headers={"X-Help": "Puedes vender a este precio sin autorizacion adicional."}
             )
-        # Si está por debajo del mínimo del vendedor, determinar correctamente a qué nivel escalar
-        if precio_propuesto >= precio_gerente_com_min:
-            return 'Gerencia_Comercial', precio_gerente_com_min
-        elif precio_propuesto >= precio_subdireccion_min:
-            return 'Subdireccion', precio_subdireccion_min
-        elif precio_propuesto >= precio_direccion_min:
-            return 'Direccion', precio_direccion_min
-        else:
-            logger.error(f"Precio propuesto por debajo del minimo absoluto: usuario_nivel=Vendedor, sku={sku}, propuesto={precio_propuesto}, direccion_min={precio_direccion_min}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"El precio propuesto (${precio_propuesto:,.2f}) está por debajo del mínimo autorizado (≥${precio_direccion_min:,.2f}).",
-                headers={"X-Help": "El precio está por debajo del mínimo absoluto. Contacta al administrador."}
-            )
     
     elif nivel_solicitante == 'Gerencia_Comercial':
-        # Si el precio propuesto está dentro del rango de Gerencia Comercial → no necesita escalamiento
-        if precio_propuesto >= precio_gerente_com_min:
+        # Si el precio propuesto está por debajo de su mínimo, va a Subdirección
+        if precio_propuesto < precio_gerente_com_min:
+            return 'Subdireccion', precio_gerente_com_min
+        else:
             logger.info(f"Solicitud innecesaria: usuario_nivel=Gerencia_Comercial, sku={sku}, propuesto={precio_propuesto}, min={precio_gerente_com_min}")
             raise HTTPException(
                 status_code=400,
                 detail=f"El precio propuesto (${precio_propuesto:,.2f}) esta dentro de tu rango autorizado (≥${precio_gerente_com_min:,.2f}). No necesitas autorizacion.",
                 headers={"X-Help": "Puedes autorizar este precio sin escalamiento adicional."}
             )
-        # Si está por debajo, escalar según rangos disponibles
-        if precio_propuesto >= precio_subdireccion_min:
-            return 'Subdireccion', precio_subdireccion_min
-        elif precio_propuesto >= precio_direccion_min:
-            return 'Direccion', precio_direccion_min
-        else:
-            logger.error(f"Precio propuesto por debajo del minimo absoluto: usuario_nivel=Gerencia_Comercial, sku={sku}, propuesto={precio_propuesto}, direccion_min={precio_direccion_min}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"El precio propuesto (${precio_propuesto:,.2f}) está por debajo del mínimo autorizado (≥${precio_direccion_min:,.2f}).",
-                headers={"X-Help": "El precio está por debajo del mínimo absoluto. Contacta al administrador."}
-            )
     
     elif nivel_solicitante == 'Subdireccion':
-        # Si el precio propuesto está dentro del rango de Subdirección → no necesita escalamiento
-        if precio_propuesto >= precio_subdireccion_min:
+        # Si el precio propuesto está por debajo de su mínimo, va a Dirección
+        if precio_propuesto < precio_subdireccion_min:
+            return 'Direccion', precio_subdireccion_min
+        else:
             logger.info(f"Solicitud innecesaria: usuario_nivel=Subdireccion, sku={sku}, propuesto={precio_propuesto}, min={precio_subdireccion_min}")
             raise HTTPException(
                 status_code=400,
                 detail=f"El precio propuesto (${precio_propuesto:,.2f}) esta dentro de tu rango autorizado (≥${precio_subdireccion_min:,.2f}). No necesitas autorizacion.",
                 headers={"X-Help": "Puedes autorizar este precio sin escalamiento adicional."}
-            )
-        # Si está por debajo, escalar a Dirección o rechazar si está por debajo del mínimo absoluto
-        if precio_propuesto >= precio_direccion_min:
-            return 'Direccion', precio_direccion_min
-        else:
-            logger.error(f"Precio propuesto por debajo del minimo absoluto: usuario_nivel=Subdireccion, sku={sku}, propuesto={precio_propuesto}, direccion_min={precio_direccion_min}")
-            raise HTTPException(
-                status_code=400,
-                detail=f"El precio propuesto (${precio_propuesto:,.2f}) está por debajo del mínimo autorizado (≥${precio_direccion_min:,.2f}).",
-                headers={"X-Help": "El precio está por debajo del mínimo absoluto. Contacta al administrador."}
             )
     
     else:
@@ -259,19 +227,6 @@ def crear_solicitud(
     """, (solicitud_id,))
     
     row = cursor.fetchone()
-    # Publicar evento SSE (no bloquear la respuesta)
-    try:
-        event = {
-            "action": "created",
-            "solicitud_id": solicitud_id,
-            "sku": solicitud.sku,
-            "transporte": solicitud.transporte,
-            "solicitante": current_user['username'],
-            "estado": "Pendiente"
-        }
-        asyncio.create_task(publish_event(event))
-    except Exception:
-        logger.warning("No se pudo publicar evento SSE para creación de solicitud")
     return schemas.SolicitudAutorizacion(
         id=row[0],
         sku=row[1],
@@ -292,16 +247,6 @@ def crear_solicitud(
         fecha_respuesta=row[16],
         comentarios_autorizador=row[17]
     )
-
-
-@router.get('/events')
-def sse_events():
-    """Endpoint SSE para notificaciones en tiempo real.
-
-    Nota: implementación en memoria (por proceso). Para despliegues con varios
-    workers usar un broker externo (Redis, etc.).
-    """
-    return sse_response()
 
 
 @router.get("/mis-solicitudes", response_model=List[schemas.SolicitudAutorizacion])
@@ -592,17 +537,6 @@ def aprobar_solicitud(
     
     row = cursor.fetchone()
     logger.info(f"Solicitud aprobada: usuario={current_user['username']} id={solicitud_id} comentario={respuesta.comentarios}")
-    # Publicar evento SSE de aprobación
-    try:
-        event = {
-            "action": "approved",
-            "solicitud_id": solicitud_id,
-            "autorizador": current_user['username'],
-            "estado": "Aprobada"
-        }
-        asyncio.create_task(publish_event(event))
-    except Exception:
-        logger.warning("No se pudo publicar evento SSE para aprobacion")
     return schemas.SolicitudAutorizacion(
         id=row[0],
         sku=row[1],
@@ -711,17 +645,6 @@ def rechazar_solicitud(
     
     row = cursor.fetchone()
     logger.info(f"Solicitud rechazada: usuario={current_user['username']} id={solicitud_id} comentario={respuesta.comentarios}")
-    # Publicar evento SSE de rechazo
-    try:
-        event = {
-            "action": "rejected",
-            "solicitud_id": solicitud_id,
-            "autorizador": current_user['username'],
-            "estado": "Rechazada"
-        }
-        asyncio.create_task(publish_event(event))
-    except Exception:
-        logger.warning("No se pudo publicar evento SSE para rechazo")
     return schemas.SolicitudAutorizacion(
         id=row[0],
         sku=row[1],

@@ -2,42 +2,17 @@
 FROM python:3.11-slim
 WORKDIR /app
 COPY requirements.txt ./
-# Build arg to optionally skip msodbc installation for faster local builds
-ARG SKIP_ODBC=0
 # Instalar dependencias del sistema para pyodbc
 RUN apt-get update \
-	&& apt-get install -y --no-install-recommends \
-		unixodbc \
-		unixodbc-dev \
-		libssl-dev \
-		gcc \
-		g++ \
-		curl \
-		ca-certificates \
-		apt-transport-https \
-		gnupg2 \
-	&& if [ "${SKIP_ODBC}" != "1" ]; then \
-		curl -sSL https://packages.microsoft.com/keys/microsoft.asc -o /etc/apt/trusted.gpg.d/microsoft.asc && \
-		# Try adding the MS package repo for the current codename, with sensible fallbacks
-		CODENAME=$(bash -lc '. /etc/os-release && echo $VERSION_CODENAME') && \
-		for D in "$CODENAME" bookworm bullseye; do \
-			echo "Trying Microsoft repo for: $D"; \
-			if curl -fsSL https://packages.microsoft.com/config/debian/$D/prod.list -o /etc/apt/sources.list.d/mssql-release.list; then \
-				apt-get update && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 && break; \
-			fi; \
-		done; \
-	else \
-		echo "SKIP_ODBC=1 - omitiendo msodbcsql18 (instaladas unixodbc + deps)" ; \
-	fi \
+	&& apt-get install -y curl apt-transport-https gnupg2 unixodbc unixodbc-dev gcc g++ \
+	&& curl -sSL https://packages.microsoft.com/keys/microsoft.asc -o /etc/apt/trusted.gpg.d/microsoft.asc \
+	&& curl -sSL https://packages.microsoft.com/config/debian/$(. /etc/os-release && echo $VERSION_CODENAME)/prod.list -o /etc/apt/sources.list.d/mssql-release.list \
+	&& apt-get update \
+	&& ACCEPT_EULA=Y apt-get install -y msodbcsql18 \
 	&& rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir -r requirements.txt
 COPY ./app ./app
 COPY ./cost_engine.py ./cost_engine.py
 COPY .env .env
 EXPOSE 8000
-ENV PYTHONUNBUFFERED=1
-ENV UVICORN_WORKERS=4
-# Use gunicorn + uvicorn workers pattern for production durability
-RUN pip install --no-cache-dir gunicorn
-# Use shell form so environment variables like $UVICORN_WORKERS are expanded at container start
-CMD gunicorn -k uvicorn.workers.UvicornWorker -w ${UVICORN_WORKERS} -b 0.0.0.0:8000 app.main:app
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
