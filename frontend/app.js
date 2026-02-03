@@ -1648,11 +1648,15 @@ function renderVendedorTable(vendedores){
         if (typeof window.jQuery !== 'undefined' && window.jQuery.fn && window.jQuery.fn.dataTable) {
             try{
                 if (!window.jQuery.fn.dataTable.isDataTable('#vendedorTable')) {
-                    window.jQuery('#vendedorTable').DataTable();
+                    window.jQuery('#vendedorTable').DataTable({
+                        columnDefs: [
+                            { targets: -1, orderable: false, searchable: false }
+                        ]
+                    });
                 }
             }catch(e){ console.warn('vendedor DataTable init failed', e); }
         }
-    }catch(err){ console.error('renderVendedorTable error', err); tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);">No fue posible renderizar resumen por vendedor.</td></tr>'; }
+    }catch(err){ console.error('renderVendedorTable error', err); tbody.innerHTML = '<tr><td colspan="9" style="color:var(--muted);">No fue posible renderizar resumen por vendedor.</td></tr>'; }
 }
 
 // Render small inline SVG sparklines for each vendedor row
