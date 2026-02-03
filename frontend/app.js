@@ -473,6 +473,7 @@ function showProductDetails(skus) {
         .filter(Boolean);
     
     if (productos.length > 0) {
+        const hideMoneda = !!(state.user && state.user.rol === 'Vendedor');
         selectors.productDetails.innerHTML = productos
             .map(producto => `
                 <div class="product-detail-card">
@@ -494,10 +495,12 @@ function showProductDetails(skus) {
                             <span class="detail-label">Categoría:</span>
                             <span class="detail-value">${producto.categoria || '-'}</span>
                         </div>
+                        ${hideMoneda ? '' : `
                         <div class="detail-item">
                             <span class="detail-label">Moneda Base:</span>
                             <span class="detail-value">${producto.moneda_base || '-'}</span>
                         </div>
+                        `}
                         <div class="detail-item">
                             <span class="detail-label">Activo:</span>
                             <span class="detail-value">${producto.activo ? 'Sí' : 'No'}</span>
