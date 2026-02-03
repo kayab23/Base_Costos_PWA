@@ -722,6 +722,13 @@ function updateUIForRole() {
                         const cotTable = document.getElementById('cotTable'); if (cotTable) {
                             const cotWrap = cotTable.closest('.table-wrapper'); if (cotWrap) cotWrap.style.display = 'none'; else cotTable.style.display = 'none';
                         }
+                        // hide specific heading texts inside dashboard to remove labels
+                        ['Gráficas','Resumen por Vendedor','Cotizaciones Recientes'].forEach(t => {
+                            try {
+                                const h = Array.from(dashboardSection.querySelectorAll('h4')).find(el => (el.textContent||'').trim() === t);
+                                if (h) h.style.display = 'none';
+                            } catch (e) { /* ignore */ }
+                        });
                         // Do not initialize full dashboard for vendedores
                     } else {
                         // Inicializar dashboard (permitir modo demo sin sesión para validación)
