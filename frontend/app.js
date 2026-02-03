@@ -495,12 +495,12 @@ function showProductDetails(skus) {
                             <span class="detail-label">Categoría:</span>
                             <span class="detail-value">${producto.categoria || '-'}</span>
                         </div>
-                        ${hideMoneda ? '' : `
+                        ${((hideMoneda || ((producto.moneda_base||'').trim() === 'USD')) ? '' : `
                         <div class="detail-item">
                             <span class="detail-label">Moneda Base:</span>
                             <span class="detail-value">${producto.moneda_base || '-'}</span>
                         </div>
-                        `}
+                        `)}
                         <div class="detail-item">
                             <span class="detail-label">Activo:</span>
                             <span class="detail-value">${producto.activo ? 'Sí' : 'No'}</span>
