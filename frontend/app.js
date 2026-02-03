@@ -713,61 +713,30 @@ function updateUIForRole() {
         loadPendientes();
         loadProcesadas();
     }
-    // Mostrar/ocultar dashboard integrado según rol
+    // Mostrar/ocultar dashboard integrado: solo Admin puede ver métricas
     try {
         const dashboardSection = document.getElementById('dashboard-section');
-        const allowedRoles = ['Vendedor','Gerencia_Comercial','Gerencia','Subdireccion','Direccion','Admin'];
+        const roleNormalized = (String(role || '')).toLowerCase();
+        const isAdmin = roleNormalized === 'admin';
         if (dashboardSection) {
-                if (allowedRoles.includes(role)) {
-                    dashboardSection.style.display = 'block';
-                    // If the user is Vendedor we hide metric panels and recent quotes
-                    if (role === 'Vendedor') {
-                        // hide header (Panel de Métricas), main metric grid and charts
-                        const headerEl = dashboardSection.querySelector('header'); if (headerEl) headerEl.style.display = 'none';
-                        const gridEl = dashboardSection.querySelector('.grid'); if (gridEl) gridEl.style.display = 'none';
-                        const ventasChart = document.getElementById('ventasChart'); if (ventasChart && ventasChart.parentElement) ventasChart.parentElement.style.display = 'none';
-                        const topClients = document.getElementById('topClients'); if (topClients && topClients.parentElement) topClients.parentElement.style.display = 'none';
-                        // hide resumen por vendedor and its search
-                        const vendedorSearch = document.getElementById('vendedor-search'); if (vendedorSearch && vendedorSearch.parentElement) vendedorSearch.parentElement.style.display = 'none';
-                        const vendedorTable = document.getElementById('vendedorTable'); if (vendedorTable) {
-                            const wrapper = vendedorTable.closest('.table-wrapper'); if (wrapper) wrapper.style.display = 'none'; else vendedorTable.style.display = 'none';
-                        }
-                        // hide cotizaciones recientes
-                        const cotTable = document.getElementById('cotTable'); if (cotTable) {
-                            const cotWrap = cotTable.closest('.table-wrapper'); if (cotWrap) cotWrap.style.display = 'none'; else cotTable.style.display = 'none';
-                        }
-                        // hide specific heading texts inside dashboard to remove labels
-                        ['Gráficas','Resumen por Vendedor','Cotizaciones Recientes'].forEach(t => {
-                            try {
-                                const headers = dashboardSection.querySelectorAll('h1,h2,h3,h4');
-                                const h = Array.from(headers).find(el => (el.textContent||'').trim() === t);
-                                if (h) h.style.display = 'none';
-                            } catch (e) { /* ignore */ }
-                        });
-                        // Do not initialize full dashboard for vendedores
+            if (isAdmin) {
+                dashboardSection.style.display = 'block';
+                // Inicializar dashboard únicamente para Admin
+                if (!state.dashboardInitialized) {
+                    if (typeof initDashboard === 'function') {
+                        try { initDashboard(); state.dashboardInitialized = true; } catch (err) { console.error('initDashboard failed', err); }
                     } else {
-                        // Inicializar dashboard (permitir modo demo sin sesión para validación)
-                        if (!state.dashboardInitialized) {
-                            if (typeof initDashboard === 'function') {
-                                try {
-                                    initDashboard();
-                                    state.dashboardInitialized = true;
-                                } catch (err) {
-                                    console.error('initDashboard failed', err);
-                                }
-                            } else {
-                                // reintentar en breve si la función aún no fue definida
-                                setTimeout(() => {
-                                    if (typeof initDashboard === 'function' && !state.dashboardInitialized) {
-                                        try { initDashboard(); state.dashboardInitialized = true; } catch (err) { console.error('initDashboard retry failed', err); }
-                                    }
-                                }, 200);
+                        setTimeout(() => {
+                            if (typeof initDashboard === 'function' && !state.dashboardInitialized) {
+                                try { initDashboard(); state.dashboardInitialized = true; } catch (err) { console.error('initDashboard retry failed', err); }
                             }
-                        }
+                        }, 200);
                     }
-                } else {
-                    dashboardSection.style.display = 'none';
                 }
+            } else {
+                // Ocultar dashboard completamente para roles no-admin
+                dashboardSection.style.display = 'none';
+            }
         }
     } catch (e) {
         console.error('dashboard visibility error', e);
