@@ -744,7 +744,8 @@ function updateUIForRole() {
                         // hide specific heading texts inside dashboard to remove labels
                         ['Gráficas','Resumen por Vendedor','Cotizaciones Recientes'].forEach(t => {
                             try {
-                                const h = Array.from(dashboardSection.querySelectorAll('h4')).find(el => (el.textContent||'').trim() === t);
+                                const headers = dashboardSection.querySelectorAll('h1,h2,h3,h4');
+                                const h = Array.from(headers).find(el => (el.textContent||'').trim() === t);
                                 if (h) h.style.display = 'none';
                             } catch (e) { /* ignore */ }
                         });
