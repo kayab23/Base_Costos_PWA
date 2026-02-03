@@ -633,8 +633,8 @@ function updateUIForRole() {
     const procesadasSection = document.getElementById('procesadas-section');
 
     if (role === 'Vendedor') {
-        if (sectionTitle) sectionTitle.textContent = 'Mi Lista de Precios';
-        if (sectionDesc) sectionDesc.textContent = 'Precios autorizados: 20% descuento desde Precio Máximo';
+    if (sectionTitle) sectionTitle.textContent = 'Mi Lista de Precios';
+    if (sectionDesc) sectionDesc.textContent = '';
         // Ocultar y deshabilitar botón de descarga Excel
         if (downloadBtn) {
             downloadBtn.style.display = 'none';
