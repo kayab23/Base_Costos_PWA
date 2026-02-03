@@ -1386,9 +1386,13 @@ async function fetchCotizaciones(q = '', limit = 20) {
         const params = new URLSearchParams();
         if (q) params.append('q', q);
         params.append('limit', String(limit));
-        const data = await apiFetch(`/cotizaciones?${params.toString()}`);
+        const data = await apiFetch(`/api/cotizaciones?${params.toString()}`);
         return data;
     } catch (e) {
+        // If backend returns 404 for empty results, treat as empty list
+        if (e && e.message && e.message.includes('404')) {
+            return [];
+        }
         console.error('Error fetching cotizaciones', e);
         showToast('No se pudieron obtener cotizaciones: ' + e.message, 'error');
         return [];
