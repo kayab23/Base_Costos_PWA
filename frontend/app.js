@@ -300,9 +300,10 @@ async function loadLanded() {
         const rows = document.querySelectorAll('.sku-input-row');
         const skuQueries = Array.from(rows)
             .map(row => {
-                const sku = row.querySelector('.sku-input').value.trim();
-                const cantidad = parseInt(row.querySelector('.cantidad-input')?.value) || 1;
-                return { sku, cantidad };
+                    const sku = row.querySelector('.sku-input').value.trim();
+                    const cantidad = parseInt(row.querySelector('.cantidad-input')?.value) || 1;
+                    const transporte = row.querySelector('.transporte-select')?.value || 'Maritimo';
+                    return { sku, cantidad, transporte };
             })
             .filter(q => q.sku);
 
@@ -318,6 +319,7 @@ async function loadLanded() {
         const promises = skuQueries.map(query => {
             const params = new URLSearchParams();
             params.append('sku', query.sku);
+            params.append('transporte', query.transporte || 'Maritimo');
             return apiFetch(`/pricing/listas?${params.toString()}`);
         });
 
@@ -331,10 +333,10 @@ async function loadLanded() {
         // --- Restaurar montos propuestos previos por SKU ---
         allData = allData.map(row => {
             const prev = prevRows.find(r => r.sku === row.sku);
-            if (prev && prev.monto_propuesto !== undefined) {
-                return { ...row, monto_propuesto: prev.monto_propuesto };
-            }
-            return row;
+            const base = prev && prev.monto_propuesto !== undefined ? { ...row, monto_propuesto: prev.monto_propuesto } : row;
+            // carry over transporte choice if user previously selected it
+            if (prev && prev.transporte) base.transporte = prev.transporte;
+            return base;
         });
 
         state.landedData = allData;
@@ -524,6 +526,13 @@ function addSkuInput() {
             <input type="number" class="cantidad-input" min="1" value="1" style="width:60px" placeholder="Cantidad">
             <button type="button" class="stepper-btn stepper-plus">+</button>
         </div>
+        <label style="display:flex;align-items:center;gap:6px;margin-left:8px;font-size:0.9rem;">
+            Transporte:
+            <select class="transporte-select">
+                <option value="Maritimo">Marítimo</option>
+                <option value="Aereo">Aéreo</option>
+            </select>
+        </label>
         <button class="icon-btn remove" title="Quitar SKU">×</button>
     `;
     selectors.skuInputsContainer.appendChild(newRow);
@@ -586,6 +595,13 @@ function clearAllSkus() {
                 <input type="number" class="cantidad-input" min="1" value="1" style="width:60px" placeholder="Cantidad">
                 <button type="button" class="stepper-btn stepper-plus">+</button>
             </div>
+            <label style="display:flex;align-items:center;gap:6px;margin-left:8px;font-size:0.9rem;">
+                Transporte:
+                <select class="transporte-select">
+                    <option value="Maritimo">Marítimo</option>
+                    <option value="Aereo">Aéreo</option>
+                </select>
+            </label>
             <button class="icon-btn add-sku" title="Agregar otro SKU">+</button>
         </div>
     `;
