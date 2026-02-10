@@ -144,8 +144,35 @@ async function apiFetch(path, options = {}) {
         ...options,
         headers,
     });
+
     try {
         if (!response.ok) {
+            // Manejo específico para sesión expirada / token inválido
+            if (response.status === 401) {
+                // Limpiar estado de autenticación
+                state.auth = null;
+                state.userRole = null;
+                localStorage.removeItem('authToken');
+                localStorage.removeItem('userRole');
+                showToast('Su sesión ha expirado. Será redirigido al login.', 'warning');
+                // Restablecer vista a solo login y recargar la página para forzar re-login
+                try {
+                    initLoginOnlyView();
+                } catch (e) {
+                    // no-op
+                }
+                // Dar un breve tiempo para que el toast sea visible
+                setTimeout(() => {
+                    try {
+                        // Recargar la aplicación en la misma ruta (sin cache fuerte)
+                        window.location.href = window.location.origin + window.location.pathname;
+                    } catch (e) {
+                        window.location.reload();
+                    }
+                }, 1200);
+                throw new Error('401: Token inválido o expirado');
+            }
+
             let detail = '';
             let help = '';
             try {
@@ -164,6 +191,7 @@ async function apiFetch(path, options = {}) {
             showToast(msg, 'error');
             throw new Error(msg);
         }
+
         // Some endpoints may return empty body
         const ct = response.headers.get('content-type') || '';
         if (!ct.includes('application/json')) {
@@ -174,6 +202,10 @@ async function apiFetch(path, options = {}) {
     } catch (netErr) {
         // Network or parsing error
         const errMsg = netErr && netErr.message ? netErr.message : String(netErr);
+        // Si es una excepción 401 lanzada arriba, ya mostramos toast; propagar para que llamantes puedan manejar
+        if (errMsg && errMsg.startsWith('401:')) {
+            throw netErr;
+        }
         showToast('Error de red o respuesta inválida: ' + errMsg, 'error');
         throw netErr;
     }
