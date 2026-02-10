@@ -379,10 +379,10 @@ async function loadLanded() {
             return;
         }
 
-        // Agrupar por SKU y categoría, y mostrar solo el registro con menor precio mínimo
+        // Agrupar por SKU, categoría y transporte para mostrar una fila por transporte
         const agrupados = {};
         allData.forEach(row => {
-            const key = row.sku + '|' + (row.categoria || '');
+            const key = row.sku + '|' + (row.categoria || '') + '|' + (row.transporte || '');
             if (!agrupados[key] || (row.precio_vendedor_min < agrupados[key].precio_vendedor_min)) {
                 agrupados[key] = row;
             }
