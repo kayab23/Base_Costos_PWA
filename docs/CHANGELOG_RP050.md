@@ -19,6 +19,7 @@ Acciones realizadas:
 3. Fijé manualmente `modelo` para RP050 (temporalmente con `Scripts/set_model_rp050.py`) y verifiqué que ahora aparece en `dbo.Productos`.
 4. Recalcule las tablas `dbo.LandedCostCache` y `dbo.PreciosCalculados` para `Maritimo` y `Aereo` (ambas escribieron 428 filas) y verifiqué las entradas para `RP050`.
 5. Eliminé `Scripts/set_model_rp050.py` (temporal) del repositorio.
+6. Rellené los porcentajes (flete, seguro, arancel, dta, honorarios) en la fila `PreciosCalculados` con `transporte = (SIN_TRANSPORTE)` para `RP050`, de modo que la fila base tenga valores coherentes si se utiliza directamente.
 
 Verificación:
 - Ejecuté `Scripts/query_sku_specific.py RP050` y confirmé que `Productos.modelo` ahora contiene "Soporte para monitores Biolight P Series" y que las tablas de costos/precios reflejan los valores recalculados.
