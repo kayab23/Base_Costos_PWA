@@ -175,3 +175,20 @@ python manage_users.py create --username admin --password Admin123! --rol admin
 - Se añadió soporte de datos demo (`loadDemoMetrics`) y tooltips responsivos para tarjetas.
 - Se corrigieron errores de front-end (JS) y se añadieron validaciones y manejo de errores en `apiFetch()`.
 - Ver detalle en `docs/DASHBOARD_CHANGELOG.md`.
+
+## Exportar SKUs a Excel (script nuevo)
+
+- Script: `Scripts/export_sku_prices.py`
+- Propósito: generar un reporte Excel con los SKUs y precios mínimos/máximos para vendedores en ambos transportes (`Maritimo`, `Aereo`).
+- Columnas generadas: `sku`, `descripcion`, `modelo`, `costo_base_mxn`, `vendedor_min_maritimo`, `maximo_maritimo`, `vendedor_min_aereo`, `maximo_aereo`.
+- Nota sobre `modelo`: el script usa `dbo.Productos.modelo` cuando está disponible; si está vacío intenta inferir `modelo` a partir de la `descripcion` usando una heurística regex (puede requerir revisión manual).
+- Uso:
+
+```bash
+.venv\Scripts\python.exe Scripts\export_sku_prices.py [salida.xlsx]
+```
+
+- Si no se indica `salida.xlsx`, el script crea `outputs/sku_prices_YYYYMMDD_HHMMSS.xlsx`.
+- Archivo generado en esta ejecución: `outputs/sku_prices_20260210_095509.xlsx`.
+
+Recomendación: revisar los SKUs cuyo `modelo` fue inferido antes de compartir el Excel con terceros.
