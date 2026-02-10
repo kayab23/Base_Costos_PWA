@@ -158,24 +158,44 @@ def calculate_landed_costs(
         tc = fx_map.get(moneda_costo, 1.0)
         costo_base_mxn = costo_base * tc
 
-        # Obtener categoría del producto
+        # Obtener categoría y origen del producto
         categoria = (producto.get("categoria") or "").strip().lower()
-        # Solo aplica flete si es equipo o insumo
-        if categoria in ["equipo", "insumo"]:
-            if transporte_key == "aereo":
-                flete_pct = 0.10  # 10% para transporte Aéreo
-            elif transporte_key == "maritimo":
-                flete_pct = 0.05  # 5% para transporte Marítimo
-            else:
-                flete_pct = 0.0
-        else:
-            flete_pct = 0.0  # Otras categorías no pagan flete
-
         origen = (producto.get("origen") or "").strip().lower()
+        # Si no hay origen explícito, inferir 'importado' cuando la moneda no sea MXN
+        if not origen and moneda_costo and moneda_costo.upper() != 'MXN':
+            origen = 'importado'
+        # Aplicar flete para productos importados; preferir valores en ParametrosImportacion
         if origen == "importado":
+            # Buscar un parámetro específico por transporte+categoria (ej: 'aereo_equipo')
+            cat_key = f"{transporte_key}_{categoria}" if categoria else None
+            flete_param = None
+            if cat_key:
+                flete_param = pct_params.get(cat_key)
+            # Si no hay por categoria, buscar por transporte general
+            if flete_param is None:
+                flete_param = pct_params.get(transporte_key)
+            if flete_param is not None:
+                try:
+                    flete_pct = float(flete_param)
+                except Exception:
+                    flete_pct = 0.0
+            else:
+                # Caer al comportamiento por categoría (compatibilidad)
+                if categoria in ["equipo", "insumo"]:
+                    if transporte_key == "aereo":
+                        flete_pct = 0.10
+                    elif transporte_key == "maritimo":
+                        flete_pct = 0.05
+                    else:
+                        flete_pct = 0.0
+                else:
+                    flete_pct = 0.0
+
             # Fórmula: Costo_Base_MXN × (1 + Flete% + Seguro% + Arancel% + DTA% + Honorarios_Aduanales%)
             landed = costo_base_mxn * (1 + flete_pct + seguro_pct + arancel_pct + dta_pct + honorarios_aduanales_pct)
         else:
+            # Productos locales no aplican flete/importación
+            flete_pct = 0.0
             landed = costo_base_mxn
         
         # Calcular Mark_up: Landed Cost × (1 + markup_pct)

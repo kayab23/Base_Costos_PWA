@@ -364,9 +364,11 @@ async function loadLanded() {
 
         // --- Restaurar montos propuestos previos por SKU ---
         allData = allData.map(row => {
-            const prev = prevRows.find(r => r.sku === row.sku);
+            // Normalizar transporte para emparejar correctamente por sku+transporte
+            const transporteNorm = (row.transporte || '').toString().replace(/\s+/g,'').replace(/[()]/g,'');
+            const prev = prevRows.find(r => r.sku === row.sku && ((r.transporte||'').toString().replace(/\s+/g,'').replace(/[()]/g,'') === transporteNorm));
             const base = prev && prev.monto_propuesto !== undefined ? { ...row, monto_propuesto: prev.monto_propuesto } : row;
-            // carry over transporte choice if user previously selected it
+            // Si el usuario previamente seleccionó transporte explícito para esa misma fila, respetarlo
             if (prev && prev.transporte) base.transporte = prev.transporte;
             return base;
         });
@@ -786,7 +788,9 @@ function renderPriceRow(row) {
         role === 'Subdireccion' ? row.precio_subdireccion_min :
         role === 'Direccion' ? row.precio_direccion_min : row.precio_direccion_min
     );
-    const montoPropuestoId = `monto-propuesto-${row.sku}`;
+    function normTrans(t){ return (t||'').toString().replace(/\s+/g,'').replace(/[()]/g,''); }
+    const transporteId = normTrans(row.transporte);
+    const montoPropuestoId = `monto-propuesto-${row.sku}--${transporteId}`;
     // Usar el monto propuesto previo si existe
     let montoPropuesto = row.monto_propuesto !== undefined ? row.monto_propuesto : '';
     let html = `
@@ -813,13 +817,13 @@ function renderPriceRow(row) {
         <td class="price-col">${formatCurrency(precioMax)}</td>
         <td class="price-col">
             <input type="text" class="monto-propuesto-input" id="${montoPropuestoId}" value="${montoPropuesto}" style="width:100px;" autocomplete="off" placeholder="Escribe monto">
-            <div class="row-warning" id="warning-${row.sku}" style="display:none;"></div>
+            <div class="row-warning" id="warning-${row.sku}--${transporteId}" style="display:none;"></div>
         </td>
         <td class="price-col">${formatCurrency(precioMin)}</td>
         <td class="price-col">${formatCurrency(precioMax * row.cantidad)}</td>
-        <td class="price-col" id="iva-cell-${row.sku}">${formatCurrency((montoPropuesto && !isNaN(parseFloat(montoPropuesto))) ? Math.round((parseFloat(montoPropuesto) * row.cantidad * 0.16)) : 0)}</td>
-        <td class="price-col" id="descuento-cell-${row.sku}">${(montoPropuesto && !isNaN(parseFloat(montoPropuesto)) && precioMax) ? ((Math.max(0, (precioMax - parseFloat(montoPropuesto)) / precioMax) * 100).toFixed(2) + '%') : '-'}</td>
-        <td class="price-col" id="total-negociado-${row.sku}">${totalNegociado}</td>
+        <td class="price-col" id="iva-cell-${row.sku}--${transporteId}">${formatCurrency((montoPropuesto && !isNaN(parseFloat(montoPropuesto))) ? Math.round((parseFloat(montoPropuesto) * row.cantidad * 0.16)) : 0)}</td>
+        <td class="price-col" id="descuento-cell-${row.sku}--${transporteId}">${(montoPropuesto && !isNaN(parseFloat(montoPropuesto)) && precioMax) ? ((Math.max(0, (precioMax - parseFloat(montoPropuesto)) / precioMax) * 100).toFixed(2) + '%') : '-'}</td>
+        <td class="price-col" id="total-negociado-${row.sku}--${transporteId}">${totalNegociado}</td>
         <td class="price-col">${formatCurrency(precioMin * row.cantidad)}</td>
         <!-- Botón PDF Cotización por SKU eliminado. Usar solo el botón global para cotizar uno o varios SKUs. -->
     </tr>`;
@@ -911,81 +915,86 @@ document.addEventListener('click', async function(e) {
 document.addEventListener('input', function(e) {
     if (e.target.classList.contains('monto-propuesto-input')) {
         const input = e.target;
-        const sku = input.id.replace('monto-propuesto-', '');
-        const row = (state.rowsCotizacion || []).find(r => r.sku === sku);
+        const idBody = input.id.replace('monto-propuesto-', '');
+        const parts = idBody.split('--');
+        const sku = parts[0];
+        const transporteId = parts[1] || '';
+        const row = (state.rowsCotizacion || []).find(r => r.sku === sku && (r.transporte||'').toString().replace(/\s+/g,'').replace(/[()]/g,'') === transporteId);
         if (!row) return;
         let monto = input.value.replace(',', '.');
         row.monto_propuesto = monto; // Guardar el monto digitado
-        // Actualizar total negociado en tiempo real
+        // Actualizar total negociado en tiempo real (por transporte)
         const cantidad = Math.round(row.cantidad);
         let montoNum = parseFloat(monto);
         if (isNaN(montoNum)) montoNum = 0;
         const total = montoNum * cantidad;
-        const totalCell = document.getElementById(`total-negociado-${sku}`);
+        const totalCell = document.getElementById(`total-negociado-${sku}--${transporteId}`);
         if (totalCell) totalCell.textContent = formatCurrency(total);
-        // Actualizar IVA (por unidad) y descuento%
-        const ivaCell = document.getElementById(`iva-cell-${sku}`);
-        const descuentoCell = document.getElementById(`descuento-cell-${sku}`);
+        // Actualizar IVA y descuento por transporte
+        const ivaCell = document.getElementById(`iva-cell-${sku}--${transporteId}`);
+        const descuentoCell = document.getElementById(`descuento-cell-${sku}--${transporteId}`);
         const precioMax = row.precio_maximo_lista ?? row.precio_maximo;
         const totalIva = Math.round(montoNum * cantidad * 0.16);
         if (ivaCell) ivaCell.textContent = formatCurrency(totalIva);
-            if (descuentoCell) {
-                if (montoNum > 0 && precioMax) {
-                    const pct = Math.max(0, (precioMax - montoNum) / precioMax) * 100;
-                    descuentoCell.textContent = pct.toFixed(2) + '%';
-                    // Validar autorización según rol pero con debounce más amplio para evitar advertencias tempranas
-                    scheduleCheckDiscount(row, sku, pct, 1200);
-                } else {
-                    descuentoCell.textContent = '-';
-                    scheduleCheckDiscount(row, sku, 0, 1200);
-                }
+        if (descuentoCell) {
+            if (montoNum > 0 && precioMax) {
+                const pct = Math.max(0, (precioMax - montoNum) / precioMax) * 100;
+                descuentoCell.textContent = pct.toFixed(2) + '%';
+                // Validar autorización según rol pero con debounce más amplio para evitar advertencias tempranas
+                scheduleCheckDiscount(row, `${sku}--${transporteId}`, pct, 1200);
+            } else {
+                descuentoCell.textContent = '-';
+                scheduleCheckDiscount(row, `${sku}--${transporteId}`, 0, 1200);
             }
+        }
     }
     // Actualizar Total Negociado si cambia la cantidad
     if (e.target.classList.contains('cantidad-input')) {
         const rowDiv = e.target.closest('.sku-input-row');
         const skuInput = rowDiv.querySelector('.sku-input');
         const sku = skuInput.value.trim();
-        const row = (state.rowsCotizacion || []).find(r => r.sku === sku);
-        if (!row) return;
         let cantidad = Math.round(parseFloat(e.target.value) || 1);
-        row.cantidad = cantidad;
-        // Obtener el monto propuesto actual
-        const montoInput = document.getElementById(`monto-propuesto-${sku}`);
-        let monto = montoInput ? parseFloat(montoInput.value.replace(',', '.')) : 0;
-        if (isNaN(monto)) monto = 0;
-        if (montoInput) montoInput.value = monto;
-        // Actualizar total negociado
-        const total = Math.round(monto) * cantidad;
-        const totalCell = document.getElementById(`total-negociado-${sku}`);
-        if (totalCell) totalCell.textContent = formatCurrency(total);
-        // También actualizar IVA y descuento cuando cambia la cantidad (IVA por unidad permanece)
-        const ivaCellQty = document.getElementById(`iva-cell-${sku}`);
-        const descuentoCellQty = document.getElementById(`descuento-cell-${sku}`);
-        const precioMaxQty = row.precio_maximo_lista ?? row.precio_maximo;
-        if (ivaCellQty) ivaCellQty.textContent = formatCurrency(Math.round(monto * cantidad * 0.16));
-        if (descuentoCellQty) {
-            if (monto > 0 && precioMaxQty) {
-                const pct = Math.max(0, (precioMaxQty - monto) / precioMaxQty) * 100;
-                descuentoCellQty.textContent = pct.toFixed(2) + '%';
-                // Cuando cambia la cantidad, usar debounce más amplio para esperar interacciones del usuario
-                scheduleCheckDiscount(row, sku, pct, 1200);
-            } else {
-                descuentoCellQty.textContent = '-';
-                scheduleCheckDiscount(row, sku, 0, 1200);
+        // Actualizar cantidad en todas las filas de cotización para ese SKU (todos los transportes)
+        const matchingRows = (state.rowsCotizacion || []).filter(r => r.sku === sku);
+        if (!matchingRows.length) return;
+        matchingRows.forEach(r => {
+            r.cantidad = cantidad;
+            const tId = (r.transporte||'').toString().replace(/\s+/g,'').replace(/[()]/g,'');
+            const montoInput = document.getElementById(`monto-propuesto-${sku}--${tId}`);
+            let monto = montoInput ? parseFloat(montoInput.value.replace(',', '.')) : 0;
+            if (isNaN(monto)) monto = 0;
+            if (montoInput) montoInput.value = monto;
+            // Actualizar total negociado por transporte
+            const total = Math.round(monto) * cantidad;
+            const totalCell = document.getElementById(`total-negociado-${sku}--${tId}`);
+            if (totalCell) totalCell.textContent = formatCurrency(total);
+            // IVA y descuento
+            const ivaCellQty = document.getElementById(`iva-cell-${sku}--${tId}`);
+            const descuentoCellQty = document.getElementById(`descuento-cell-${sku}--${tId}`);
+            const precioMaxQty = r.precio_maximo_lista ?? r.precio_maximo;
+            if (ivaCellQty) ivaCellQty.textContent = formatCurrency(Math.round(monto * cantidad * 0.16));
+            if (descuentoCellQty) {
+                if (monto > 0 && precioMaxQty) {
+                    const pct = Math.max(0, (precioMaxQty - monto) / precioMaxQty) * 100;
+                    descuentoCellQty.textContent = pct.toFixed(2) + '%';
+                    scheduleCheckDiscount(r, `${sku}--${tId}`, pct, 1200);
+                } else {
+                    descuentoCellQty.textContent = '-';
+                    scheduleCheckDiscount(r, `${sku}--${tId}`, 0, 1200);
+                }
             }
-        }
+        });
     }
 });
 
 // Programar validación con debounce para evitar advertencias al teclear
-function scheduleCheckDiscount(row, sku, pct, delay = 1200) {
+function scheduleCheckDiscount(row, uniqueKey, pct, delay = 1200) {
     try {
-        if (debounceTimers[sku]) clearTimeout(debounceTimers[sku]);
+        if (debounceTimers[uniqueKey]) clearTimeout(debounceTimers[uniqueKey]);
         // Esperar `delay` ms después del último carácter
-        debounceTimers[sku] = setTimeout(() => {
-            checkDiscountAuthorization(row, sku, pct);
-            delete debounceTimers[sku];
+        debounceTimers[uniqueKey] = setTimeout(() => {
+            checkDiscountAuthorization(row, uniqueKey, pct);
+            delete debounceTimers[uniqueKey];
         }, delay);
     } catch (e) {
         console.error('scheduleCheckDiscount error', e);
@@ -996,13 +1005,17 @@ function scheduleCheckDiscount(row, sku, pct, delay = 1200) {
 document.addEventListener('blur', function(e) {
     if (e.target && e.target.classList && e.target.classList.contains('monto-propuesto-input')) {
         const input = e.target;
-        const sku = input.id.replace('monto-propuesto-', '');
-        const row = (state.rowsCotizacion || []).find(r => r.sku === sku);
+        const idBody = input.id.replace('monto-propuesto-', '');
+        const parts = idBody.split('--');
+        const sku = parts[0];
+        const transporteId = parts[1] || '';
+        const uniqueKey = `${sku}--${transporteId}`;
+        const row = (state.rowsCotizacion || []).find(r => r.sku === sku && (r.transporte||'').toString().replace(/\s+/g,'').replace(/[()]/g,'') === transporteId);
         if (!row) return;
         // cancelar debounce pendiente y validar ahora
-        if (debounceTimers[sku]) {
-            clearTimeout(debounceTimers[sku]);
-            delete debounceTimers[sku];
+        if (debounceTimers[uniqueKey]) {
+            clearTimeout(debounceTimers[uniqueKey]);
+            delete debounceTimers[uniqueKey];
         }
         let monto = input.value.replace(',', '.');
         let montoNum = parseFloat(monto);
@@ -1013,24 +1026,23 @@ document.addEventListener('blur', function(e) {
             pct = Math.max(0, (precioMax - montoNum) / precioMax) * 100;
         }
         // Forzar validación al perder foco
-        checkDiscountAuthorization(row, sku, pct, true);
+        checkDiscountAuthorization(row, uniqueKey, pct, true);
     }
 }, true);
 
     // Verifica si el descuento solicitado excede el permitido por el rol
-    function checkDiscountAuthorization(row, sku, pct, force = false) {
+    function checkDiscountAuthorization(row, uniqueKey, pct, force = false) {
         const role = state.userRole || 'Vendedor';
         const allowed = allowedDiscountByRole[role] ?? 0;
-        const warningEl = document.getElementById(`warning-${sku}`);
+        const warningEl = document.getElementById(`warning-${uniqueKey}`);
         const pdfBtn = document.getElementById('pdf-cotizar-btn-global');
-        if (!warningEl || !pdfBtn) return;
+        if (!pdfBtn) return;
 
         // Evitar advertencias si el monto propuesto aún es muy corto (ej: el vendedor sigue tipeando)
         try {
-            const inputEl = document.getElementById(`monto-propuesto-${sku}`);
+            const inputEl = document.getElementById(`monto-propuesto-${uniqueKey}`);
             if (inputEl && !force) {
                 const raw = (inputEl.value || '').replace(/[^0-9]/g, '');
-                // Si quedan menos de 3 dígitos numéricos, asumimos que aún está tipeando
                 if (raw.length < 3) return;
             }
         } catch (e) {
@@ -1038,44 +1050,44 @@ document.addEventListener('blur', function(e) {
         }
 
         if (pct > allowed) {
-                    // Guardar contexto de solicitud pendiente
-                    pendingAuthRequest = { sku, row, pct: Number(pct), allowed: Number(allowed), role };
-                    // Mostrar modal de advertencia visual
-                    const modal = document.getElementById('discount-modal');
-                    const modalBody = document.getElementById('modal-body');
-                    const modalTitle = document.getElementById('modal-title');
-                    if (modal && modalBody && modalTitle) {
-                        modalTitle.textContent = `Descuento no autorizado`;
-                        modalBody.innerHTML = `El descuento solicitado de <strong>${Number(pct).toFixed(2)}%</strong> supera tu límite autorizado de <strong>${Number(allowed)}%</strong> para el rol <strong>${role}</strong>.<br>Si necesitas continuar, solicita autorización.`;
-                        modal.style.display = 'flex';
-                    }
-                    // Resaltar la fila
-                    const input = document.getElementById(`monto-propuesto-${sku}`);
-                    if (input) input.classList.add('invalid-input');
-                    // Mostrar advertencia inline en la fila
-                    if (warningEl) {
-                        warningEl.style.display = 'block';
-                        warningEl.innerHTML = `Descuento ${Number(pct).toFixed(2)}% &gt; ${Number(allowed)}% (Tu rol: ${role})`;
-                    }
-                    // Bloquear botón global para avanzar
-                    pdfBtn.disabled = true;
-                    pdfBtn.classList.add('disabled');
-                    showToast(`Descuento ${Number(pct).toFixed(2)}% supera tu límite de ${Number(allowed)}%. Debes solicitar autorización.`, 'error', 5000);
+            // Guardar contexto de solicitud pendiente
+            pendingAuthRequest = { uniqueKey, sku: row.sku, row, pct: Number(pct), allowed: Number(allowed), role };
+            // Mostrar modal de advertencia visual
+            const modal = document.getElementById('discount-modal');
+            const modalBody = document.getElementById('modal-body');
+            const modalTitle = document.getElementById('modal-title');
+            if (modal && modalBody && modalTitle) {
+                modalTitle.textContent = `Descuento no autorizado`;
+                modalBody.innerHTML = `El descuento solicitado de <strong>${Number(pct).toFixed(2)}%</strong> supera tu límite autorizado de <strong>${Number(allowed)}%</strong> para el rol <strong>${role}</strong>.<br>Si necesitas continuar, solicita autorización.`;
+                modal.style.display = 'flex';
+            }
+            // Resaltar la fila
+            const input = document.getElementById(`monto-propuesto-${uniqueKey}`);
+            if (input) input.classList.add('invalid-input');
+            // Mostrar advertencia inline en la fila
+            if (warningEl) {
+                warningEl.style.display = 'block';
+                warningEl.innerHTML = `Descuento ${Number(pct).toFixed(2)}% &gt; ${Number(allowed)}% (Tu rol: ${role})`;
+            }
+            // Bloquear botón global para avanzar
+            pdfBtn.disabled = true;
+            pdfBtn.classList.add('disabled');
+            showToast(`Descuento ${Number(pct).toFixed(2)}% supera tu límite de ${Number(allowed)}%. Debes solicitar autorización.`, 'error', 5000);
         } else {
             // Quitar advertencia
-                if (warningEl) {
-                    warningEl.style.display = 'none';
-                    warningEl.innerHTML = '';
-                }
-            const input = document.getElementById(`monto-propuesto-${sku}`);
+            if (warningEl) {
+                warningEl.style.display = 'none';
+                warningEl.innerHTML = '';
+            }
+            const input = document.getElementById(`monto-propuesto-${uniqueKey}`);
             if (input) input.classList.remove('invalid-input');
             // Habilitar botón solo si no hay otras advertencias activas
-                const anyWarnings = document.querySelectorAll('.row-warning').length && Array.from(document.querySelectorAll('.row-warning')).some(w => w.style.display === 'block');
+            const anyWarnings = document.querySelectorAll('.row-warning').length && Array.from(document.querySelectorAll('.row-warning')).some(w => w.style.display === 'block');
             if (!anyWarnings) {
                 pdfBtn.disabled = false;
                 pdfBtn.classList.remove('disabled');
-                    // Limpiar contexto pendiente si aplica
-                    if (pendingAuthRequest && pendingAuthRequest.sku === sku) pendingAuthRequest = null;
+                // Limpiar contexto pendiente si aplica
+                if (pendingAuthRequest && pendingAuthRequest.uniqueKey === uniqueKey) pendingAuthRequest = null;
             }
         }
     }
