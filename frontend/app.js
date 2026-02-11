@@ -225,7 +225,7 @@ selectors.connectBtn.addEventListener('click', async () => {
     try {
         selectors.status.textContent = 'Conectando...';
         selectors.connectBtn.style.display = 'none';
-        if (logoutBtn) logoutBtn.style.display = '';
+        if (logoutBtn) { logoutBtn.style.display = 'inline-block'; logoutBtn.style.zIndex = '1000'; try { logoutBtn.scrollIntoView({block: 'center', inline: 'nearest'}); } catch(e){} }
         state.baseUrl = selectors.apiUrl.value.trim();
         const username = selectors.username.value.trim();
         const password = selectors.password.value;
@@ -270,7 +270,7 @@ selectors.connectBtn.addEventListener('click', async () => {
         selectors.userRole.textContent = `Rol: ${state.userRole}`;
         selectors.userRole.style.display = 'block';
         selectors.connectBtn.style.display = 'none';
-        if (logoutBtn) logoutBtn.style.display = '';
+        if (logoutBtn) { logoutBtn.style.display = 'inline-block'; logoutBtn.style.zIndex = '1000'; try { logoutBtn.scrollIntoView({block: 'center', inline: 'nearest'}); } catch(e){} }
 
         updateUIForRole();
         showToast('Inicio de sesión exitoso.', 'success');
@@ -534,6 +534,10 @@ function showProductDetails(skus) {
                             <span class="detail-label">Activo:</span>
                             <span class="detail-value">${producto.activo ? 'Sí' : 'No'}</span>
                         </div>
+                            <div class="detail-item">
+                                <span class="detail-label">Segmento Hospitalario:</span>
+                                <span class="detail-value">${producto.segmento_hospitalario || '-'}</span>
+                            </div>
                     </div>
                 </div>
             `)

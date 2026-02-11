@@ -49,6 +49,7 @@ class Producto(BaseModel):
     descripcion: Optional[str] = None
     proveedor: Optional[str] = None
     origen: Optional[str] = None
+    segmento_hospitalario: Optional[str] = None
     categoria: Optional[str] = None
     unidad: Optional[str] = None
     moneda_base: Optional[str] = None

@@ -56,7 +56,7 @@ def fetch_reference_data(cursor: pyodbc.Cursor) -> Dict[str, Any]:
     # Ahora los costos están en la tabla Productos
     data["productos"] = fetch_dicts(
         cursor,
-        "SELECT sku, origen, categoria, moneda_base, costo_base, fecha_actualizacion FROM dbo.Productos",
+        "SELECT sku, origen, categoria, moneda_base, costo_base, fecha_actualizacion, Segmento_Hospitalario AS segmento_hospitalario FROM dbo.Productos",
     )
     data["parametros"] = fetch_dicts(
         cursor,

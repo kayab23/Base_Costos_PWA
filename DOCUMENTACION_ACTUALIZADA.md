@@ -56,3 +56,28 @@ Tablas eliminadas/no usadas: Versiones, CostosBase, PoliticasMargen, ControlVers
 - Scripts de prueba usados y luego limpiados del control de versiones cuando eran temporales.
 
 **Última actualización:** 23/01/2026
+
+---
+
+## 8. Cambios aplicados (2026-02-11)
+
+- Añadida columna `Segmento_Hospitalario` a `dbo.Productos` (valor por defecto 'Infusión') y backfill de datos (se actualizó en entorno local, 428 filas). Script: `Scripts/add_segmento_hospitalario.py`.
+- Añadida columna `descripcion` a `dbo.PreciosCalculados` y backfill desde `dbo.Productos`. Script: `Scripts/add_descripcion_to_precios.py`.
+- Añadida columna `Segmento_Hospitalario` a `dbo.PreciosCalculados` y backfill desde `dbo.Productos`. Script: `Scripts/add_segmento_to_precios.py`.
+- Creación de vistas para presentar columnas en el orden requerido sin modificar tablas físicas:
+  - `dbo.Productos_view` (incluye `Segmento_Hospitalario` después de `modelo`). Script: `Scripts/create_productos_view.py`.
+  - `dbo.PreciosCalculados_view` (orden: sku, descripcion, Segmento_Hospitalario, ...). Script: `Scripts/create_precios_calculados_view.py`.
+  - `dbo.PreciosCalculados_vendedor` (resumen para vendedores: `sku, descripcion, Segmento_Hospitalario, transporte, precio_vendedor_min, precio_maximo`). Script: `Scripts/create_precios_vendedor_view.py`.
+- Actualizaciones en la aplicación para exponer el nuevo campo `segmento_hospitalario`:
+  - `app/schemas.py`, `cost_engine.py`, `frontend/app.js`.
+- Tests y validación:
+  - Se validó localmente la creación de vistas y la consistencia de datos; se ejecutaron tests unitarios y E2E tras los cambios.
+
+---
+
+## 9. Limpieza realizada (2026-02-11)
+
+- Eliminados scripts temporales de verificación/depuración almacenados en `archive/temp_cleanup_2026-02-10_1805`.
+- Se añadieron scripts migración y verificación permanentes dentro de `Scripts/`.
+
+Si necesitas que haga la migración en la instancia de producción, indícame la ventana de mantenimiento y la cadena de conexión segura; por seguridad no ejecuto DDL en entornos remotos sin autorización expresa y acceso seguro.
