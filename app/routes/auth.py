@@ -30,12 +30,13 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
     logger = logging.getLogger("auth_debug")
     cursor = conn.cursor()
     logger.info(f"Intento de login: username={form_data.username}")
+    # Buscar usuario por username normalizado (case-insensitive)
     user = fetch_one(
         cursor,
         """
-        SELECT usuario_id, username, password_hash, rol, es_activo
+        SELECT usuario_id, username, password_hash, rol, es_activo, ISNULL(password_case_sensitive, 0) AS password_case_sensitive
         FROM dbo.Usuarios
-        WHERE username = ?
+        WHERE LOWER(LTRIM(RTRIM(username))) = LOWER(LTRIM(RTRIM(?)))
         """,
         [form_data.username],
     )
@@ -47,7 +48,12 @@ async def login(request: Request, form_data: OAuth2PasswordRequestForm = Depends
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario no encontrado o inactivo")
     logger.info(f"Hash en BD: {user['password_hash']}")
     try:
-        valid = verify_password(form_data.password, user["password_hash"])
+        # Si el usuario marcó su contraseña como case-sensitive, verificar exactamente.
+        if user.get("password_case_sensitive"):
+            valid = verify_password(form_data.password, user["password_hash"])
+        else:
+            # Intentar verificar con la entrada tal cual o con la versión en minúsculas
+            valid = verify_password(form_data.password, user["password_hash"]) or verify_password(form_data.password.lower(), user["password_hash"])
     except Exception as e:
         logger.error(f"Error en verify_password: {e}")
         valid = False
