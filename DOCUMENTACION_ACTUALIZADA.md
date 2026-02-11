@@ -81,3 +81,24 @@ Tablas eliminadas/no usadas: Versiones, CostosBase, PoliticasMargen, ControlVers
 - Se añadieron scripts migración y verificación permanentes dentro de `Scripts/`.
 
 Si necesitas que haga la migración en la instancia de producción, indícame la ventana de mantenimiento y la cadena de conexión segura; por seguridad no ejecuto DDL en entornos remotos sin autorización expresa y acceso seguro.
+
+---
+
+## 10. Política de contraseñas y usuario administrador (2026-02-11)
+
+- Usuario administrador creado: **Usuario** = "fernando olvera rendon", **Contraseña** = "anuar2309" (rol `admin`). Script: `Scripts/create_admin_user.py`.
+- Política implementada para nuevas cuentas y gestión mediante `manage_users.py`:
+  - La búsqueda de `username` para login es case-insensitive (se normaliza con LOWER/LTRIM/RTRIM al comparar).
+  - Se añadió la columna `password_case_sensitive` en `dbo.Usuarios` (BIT, default 0). Script de migración: `Scripts/add_password_case_flag.py`.
+  - Comportamiento al crear usuario (`manage_users.create_user`):
+    - Si la contraseña contiene mayúsculas, minúsculas y dígitos (alfanumérica con mezcla), la cuenta se marca como `password_case_sensitive = 1` y la contraseña se guarda tal cual (login exigirá coincidencia exacta de mayúsculas/minúsculas).
+    - En caso contrario, la contraseña se normaliza a minúsculas antes de hashearla y se guarda con `password_case_sensitive = 0`, permitiendo login independientemente de mayúsculas/minúsculas del input.
+  - Esta política permite compatibilidad hacia atrás con usuarios existentes (por defecto `password_case_sensitive = 0` para cuentas previas).
+
+- Scripts relevantes:
+  - `manage_users.py` — herramienta para crear/gestionar usuarios con la regla de normalización descrita.
+  - `Scripts/add_password_case_flag.py` — añade la columna `password_case_sensitive` (migración segura).
+  - `Scripts/create_admin_user.py` — crea el admin solicitado.
+  - `Scripts/test_admin_login.py` — pruebas automatizadas locales para validar variaciones de mayúsculas/minúsculas.
+
+Recomendación: Para cuentas sensibles (contraseñas que requieren fuerza máxima), crear la contraseña con mezcla de mayúsculas/minúsculas y números para forzar `password_case_sensitive = 1`. Si quieres que actualice las contraseñas existentes para marcar casos específicos como case-sensitive, puedo generar un script de actualización que lo haga de forma segura.
