@@ -32,18 +32,11 @@ import os
 from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
-
 import pyodbc
+from app.db import connect
 from openpyxl import load_workbook
 
 FILE_NAME = "Plantilla_Pricing_Costos_Importacion.xlsx"
-DEFAULT_CONN_STR = (
-    "DRIVER={ODBC Driver 18 for SQL Server};"
-    "SERVER=localhost\\SQLEXPRESS;"
-    "DATABASE=BD_Calculo_Costos;"
-    "Trusted_Connection=yes;"
-    "TrustServerCertificate=yes;"
-)
 
 
 def to_decimal(value: Any, default: float | None = None) -> float | None:
@@ -189,16 +182,14 @@ def read_tipos_cambio(ws) -> List[Dict[str, Any]]:
 
 
 def main() -> None:
-    conn_str = os.getenv("SQLSERVER_CONN", DEFAULT_CONN_STR)
     wb = load_workbook(FILE_NAME, data_only=True)
-
     sheets = {
         "catalogo": wb["CATALOGO_PRODUCTOS"],
         "parametros": wb["PARAMETROS_IMPORTACION"],
         "tipos_cambio": wb["TIPOS_CAMBIO"],
     }
 
-    with pyodbc.connect(conn_str, autocommit=False) as conn:
+    with connect() as conn:
         cursor = conn.cursor()
 
         catalog_rows = read_catalogo(sheets["catalogo"])

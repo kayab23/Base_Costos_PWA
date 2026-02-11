@@ -13,6 +13,13 @@ def _connect() -> pyodbc.Connection:
     return pyodbc.connect(settings.sqlserver_conn, autocommit=False)
 
 
+def connect() -> pyodbc.Connection:
+    """Conexión directa (no context-manager). Use `with connect() as conn:` para
+    obtener una conexión gestionada.
+    """
+    return _connect()
+
+
 @contextmanager
 def connection_scope() -> Iterable[pyodbc.Connection]:
     conn = _connect()

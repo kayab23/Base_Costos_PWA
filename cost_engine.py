@@ -29,27 +29,20 @@ datos de otros transportes al recalcular).
 from __future__ import annotations
 
 import argparse
-import os
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Sequence, Tuple
 
+import os
 import pyodbc
 
-DEFAULT_CONN_STR = (
-    "DRIVER={ODBC Driver 18 for SQL Server};"
-    "SERVER=.\\SQLEXPRESS;"
-    "DATABASE=BD_Calculo_Costos;"
-    "Trusted_Connection=yes;"
-    "TrustServerCertificate=yes;"
-)
+# Use centralized DB connector
+from app.db import connect as get_connection
 
 PRICE_MIN_MULTIPLIER = 1.10
 
 
-def get_connection() -> pyodbc.Connection:
-    conn_str = os.getenv("SQLSERVER_CONN", DEFAULT_CONN_STR)
-    return pyodbc.connect(conn_str, autocommit=False)
+# Note: `get_connection()` is provided by `app.db.connect` alias above
 
 
 def fetch_dicts(cursor: pyodbc.Cursor, query: str) -> List[Dict[str, Any]]:

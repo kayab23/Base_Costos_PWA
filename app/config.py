@@ -2,7 +2,6 @@
 from __future__ import annotations
 import os
 from dataclasses import dataclass, field
-from cost_engine import DEFAULT_CONN_STR
 from dotenv import load_dotenv
 load_dotenv()
 

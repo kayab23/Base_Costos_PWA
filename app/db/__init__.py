@@ -17,6 +17,11 @@ def _connect() -> pyodbc.Connection:
     return pyodbc.connect(settings.sqlserver_conn, autocommit=False)
 
 
+def connect() -> pyodbc.Connection:
+    """Devuelve una conexión pyodbc; use `with connect() as conn:` para manejarla."""
+    return _connect()
+
+
 @contextmanager
 def connection_scope() -> Iterable[pyodbc.Connection]:
     conn = _connect()
@@ -56,6 +61,7 @@ def fetch_one(
 __all__ = [
     "connection_scope",
     "get_connection",
+    "connect",
     "fetch_all",
     "fetch_one",
 ]

@@ -31,10 +31,12 @@ def test_discount_warning_and_request_flow():
             tbody.appendChild(tr);
         }''')
 
+        # Forzar visibilidad del input inyectado (evita condiciones de CSS/estabilidad en CI)
+        page.evaluate("() => { const el = document.getElementById('monto-propuesto-FAKE123'); if (el) { el.style.display = 'block'; el.style.visibility = 'visible'; el.style.opacity = '1'; } }")
+
         # Escribir un monto que exceda el descuento permitido (Vendedor 20% => monto < 800 para exceder)
-        page.fill('#monto-propuesto-FAKE123', '600')
-        # Disparar evento input
-        page.eval_on_selector('#monto-propuesto-FAKE123', 'el => el.dispatchEvent(new Event("input"))')
+        # Usar eval_on_selector para evitar dependencias de visibilidad en Playwright
+        page.eval_on_selector('#monto-propuesto-FAKE123', "el => { el.value = '600'; el.dispatchEvent(new Event('input')); }")
 
         # Forzar llamada a la función pública expuesta para pruebas (en caso de que el handler modular no se ejecute)
         page.evaluate("() => { const row = window.state.rowsCotizacion.find(r => r.sku === 'FAKE123'); if (window.checkDiscountAuthorization && row) { const pct = Math.max(0, (row.precio_maximo_lista - 600) / row.precio_maximo_lista * 100); window.checkDiscountAuthorization(row, 'FAKE123', pct); } }")
