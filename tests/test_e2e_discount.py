@@ -50,6 +50,8 @@ def test_discount_warning_and_request_flow():
         assert pdf_disabled is True
 
         # Pulsar 'Solicitar autorización' desde el modal
+        # Asegurar que el campo cliente tenga un valor para que se rellene en el formulario
+        page.evaluate("() => { const cli = document.getElementById('input-cliente') || document.createElement('input'); if (!document.getElementById('input-cliente')) { cli.id = 'input-cliente'; document.body.appendChild(cli); } cli.value = 'ClienteTest'; }")
         page.click('#modal-request-auth')
 
         # Verificar que la sección de solicitud se muestre y esté prellenada
@@ -58,7 +60,11 @@ def test_discount_warning_and_request_flow():
         assert sol_display != 'none'
         sol_sku = page.eval_on_selector('#sol-sku', 'el => el.value')
         sol_precio = page.eval_on_selector('#sol-precio', 'el => el.value')
+        sol_cliente = page.eval_on_selector('#sol-cliente', 'el => el.value')
+        sol_cantidad = page.eval_on_selector('#sol-cantidad', 'el => el.value')
         assert sol_sku == 'FAKE123'
         assert sol_precio in ('600', '600.0')
+        assert sol_cliente == 'ClienteTest'
+        assert sol_cantidad in ('1', '1.0')
 
         browser.close()
