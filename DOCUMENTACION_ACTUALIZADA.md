@@ -80,6 +80,16 @@ Tablas eliminadas/no usadas: Versiones, CostosBase, PoliticasMargen, ControlVers
 - Eliminados scripts temporales de verificación/depuración almacenados en `archive/temp_cleanup_2026-02-10_1805`.
 - Se añadieron scripts migración y verificación permanentes dentro de `Scripts/`.
 
+## 11. Limpieza adicional y artefactos temporales (2026-02-17)
+
+- Se eliminaron artefactos temporales y archivos de salida generados durante pruebas locales para mantener el repositorio limpio:
+  - Eliminadas carpetas `__pycache__` recursivas y archivos `.pyc` (local y generados en el virtualenv cuando aplicable).
+  - Eliminado `logs/app.log` (archivo de log local de desarrollo).
+  - Vaciada la carpeta `outputs/` (archivos de exportación temporales como `catalog_landed_markup_*.xlsx` y `sku_prices_*.xlsx`).
+  - Eliminado `test_cotizacion.pdf` y archivos temporales de Office que empiezan por `~$`.
+
+Nota: estas operaciones fueron realizadas localmente y se ha añadido un script de limpieza en `Scripts/cleanup_temp_files.py` para repetir la limpieza de forma segura cuando sea necesario.
+
 Si necesitas que haga la migración en la instancia de producción, indícame la ventana de mantenimiento y la cadena de conexión segura; por seguridad no ejecuto DDL en entornos remotos sin autorización expresa y acceso seguro.
 
 ---
