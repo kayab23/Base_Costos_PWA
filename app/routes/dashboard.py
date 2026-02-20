@@ -25,7 +25,7 @@ def metrics(periodDays: int = Query(30, alias='periodDays'), vendedor: Optional[
             "FROM dbo.cotizaciones "
             "WHERE created_at >= ? "
         )
-        params = [cutoff]
+        params: list[object] = [cutoff]
         if vendedor and vendedor != 'all':
             sql += " AND vendedor = ? "
             params.append(vendedor)

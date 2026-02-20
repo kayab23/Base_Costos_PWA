@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base Costos PWA</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="app-header">
+        <img src="icons/logo.png" alt="Vitaris Logo" class="app-logo">
+        <h1 class="app-title">Base Costos</h1>
+    </header>
+    
+    <main>
+        <section class="hero">
+            <div>
+                <p class="eyebrow">Pilot build</p>
+                <h2>Tablero de Costos & Pricing</h2>
+                <p class="lede">Consulta catálogos, recalcula landed cost y comparte precios actualizados desde cualquier dispositivo.</p>
+            </div>
+            <div class="card login-card">
+                <h2>Conecta con el backend</h2>
+                <label>URL del API
+                    <input id="api-url" type="url" value="http://localhost:8000" autocomplete="off">
+                </label>
+                <label>Usuario
+                    <input id="username" type="text" value="admin" autocomplete="username">
+                </label>
+                <label>Contraseña
+                    <input id="password" type="password" value="Admin123!" autocomplete="current-password">
+                </label>
+                <button id="connect-btn">Autenticar</button>
+                <button id="logout-btn" style="display:none; margin-left:10px;">Cerrar sesión</button>
+                <p id="status-msg" class="status">Sin conexión</p>
+                <p id="user-role" class="status" style="display:none; color: #00ff88; font-weight: 600;"></p>
+                <p id="sse-status" class="status" style="display:none; color:#ffd166; font-weight:600;">SSE: desconectado</p>
+            </div>
+        </section>
+
+        <section class="card">
+            <header>
+                <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                    <h3 id="section-title">Listas de Precios</h3>
+                    <p id="section-description">Consulta precios según tu nivel de autorización.</p>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label>Cliente
+                            <input type="text" id="input-cliente" placeholder="Nombre del cliente" autocomplete="off">
+                        </label>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 12px;">
+                        <label>Vendedor
+                            <input type="text" id="input-vendedor" placeholder="Nombre del vendedor" autocomplete="off">
+                        </label>
+                    </div>
+                    <div style="display: flex; align-items: flex-end; gap: 1.5rem; flex-wrap: wrap;">
+                        <div>
+                            <h4 style="margin-bottom: 0.5rem;">SKUs a cotizar:</h4>
+                            <!-- Transporte por SKU solo (select global eliminado) -->
+                            <div id="sku-inputs-container" class="sku-inputs">
+                                <div class="sku-input-row">
+                                    <input type="text" class="sku-input" placeholder="Ingrese SKU" list="sku-list" autocomplete="off">
+                                    <select class="transporte-select">
+                                        <option value="maritimo">Marítimo</option>
+                                        <option value="aereo">Aéreo</option>
+                                    </select>
+                                    <div class="cantidad-stepper">
+                                        <button type="button" class="stepper-btn stepper-minus">−</button>
+                                        <input type="number" class="cantidad-input" placeholder="Cantidad" min="1" value="1" style="width:60px;">
+                                        <button type="button" class="stepper-btn stepper-plus">+</button>
+                                    </div>
+                                    <button class="icon-btn add-sku" title="Agregar otro SKU">+</button>
+                                </div>
+                            </div>
+                            <datalist id="sku-list"></datalist>
+                            <datalist id="clientes-list"></datalist>
+                            <datalist id="vendedores-list"></datalist>
+                        </div>
+                        <div class="button-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                            <button class="ghost" data-action="load-landed">Consultar</button>
+                            <button class="ghost" id="clear-skus">Limpiar</button>
+                            <button class="primary pdf-cotizar-btn" id="pdf-cotizar-btn-global" style="font-weight:600;">📄 PDF Cotización</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            <div class="table-wrapper">
+                <table id="landed-table">
+                    <thead id="table-header">
+                        <tr>
+                            <th>SKU</th>
+                            <th>Cantidad</th>
+                            <th class="admin-gerencia">Costo Base MXN</th>
+                            <th class="admin-gerencia">Flete %</th>
+                            <th class="admin-gerencia">Seguro %</th>
+                            <th class="admin-gerencia">Arancel %</th>
+                            <th class="admin-gerencia">DTA %</th>
+                            <th class="admin-gerencia">Hon. Aduanales %</th>
+                            <th class="admin-gerencia">Landed Cost</th>
+                            <th class="admin-gerencia">Mark-up Base</th>
+                            <th class="price-col">Precio Máximo de Lista</th>
+                            <th class="price-col">Monto Propuesto</th>
+                            <th class="price-col">Precio Mínimo de Lista</th>
+                            <th class="price-col">Total Máximo</th>
+                            <th class="price-col">IVA (16%)</th>
+                            <th class="price-col">Descuento %</th>
+                            <th class="price-col">Total Negociado</th>
+                            <th class="price-col">Total Mínimo</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="card" id="product-details-card" style="display: none;">
+            <header>
+                <h3>Detalles de Productos</h3>
+            </header>
+            <div id="product-details" class="products-details-container">
+                <!-- Se llenará dinámicamente con JavaScript -->
+            </div>
+        </section>
+
+        <!-- Sección para solicitar autorizaciones (Vendedores y Gerencia Comercial) -->
+        <section class="card" id="solicitar-autorizacion-section" style="display: none;">
+            <header>
+                <h3>Solicitar Autorización de Descuento</h3>
+                <p>Solicita aprobación para ofrecer un precio por debajo de tu límite autorizado</p>
+            </header>
+            <form id="solicitud-form">
+                <div class="form-group">
+                    <label>SKU*
+                        <input type="text" id="sol-sku" list="sku-list" required>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Precio Propuesto (MXN)*
+                        <input type="number" id="sol-precio" step="0.01" min="0" required>
+                    </label>
+                    <label>Cliente
+                        <input type="text" id="sol-cliente">
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Cantidad
+                        <input type="number" id="sol-cantidad" min="1">
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>Justificación*
+                        <textarea id="sol-justificacion" rows="3" required placeholder="Explique por qué necesita este descuento adicional..."></textarea>
+                    </label>
+                </div>
+                <button type="submit" class="primary">Enviar Solicitud</button>
+                <p id="solicitud-status" class="status"></p>
+            </form>
+        </section>
+
+        <!-- Sección para ver solicitudes pendientes (Gerencia Comercial y Gerencia) -->
+        <section class="card" id="pendientes-section" style="display: none;">
+            <header>
+                <div>
+                    <h3>Solicitudes Pendientes de Autorización</h3>
+                    <p>Revisa y aprueba solicitudes de descuentos adicionales</p>
+                </div>
+                <button class="ghost" id="refresh-pendientes">🔄 Actualizar</button>
+            </header>
+            <div class="table-wrapper">
+                <table id="pendientes-table">
+                    <thead>
+                        <tr>
+                            <th>Solicitante</th>
+                            <th>SKU</th>
+                            <th>Transporte</th>
+                            <th>Precio Actual</th>
+                            <th>Precio Propuesto</th>
+                            <th>Descuento %</th>
+                            <th>Cliente</th>
+                            <th>Cant.</th>
+                            <th>Justificación</th>
+                            <th>Fecha</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Sección para ver historial de aprobaciones (Gerencia Comercial y Gerencia) -->
+        <section class="card" id="procesadas-section" style="display: none;">
+            <header>
+                <div>
+                    <h3>Historial de Aprobaciones</h3>
+                    <p>Solicitudes que has aprobado o rechazado</p>
+                </div>
+                <button class="ghost" id="refresh-procesadas">🔄 Actualizar</button>
+            </header>
+            <div class="table-wrapper">
+                <table id="procesadas-table">
+                    <thead>
+                        <tr>
+                            <th>Solicitante</th>
+                            <th>SKU</th>
+                            <th>Transporte</th>
+                            <th>Precio Propuesto</th>
+                            <th>Cliente</th>
+                            <th>Estado</th>
+                            <th>Fecha Solicitud</th>
+                            <th>Fecha Respuesta</th>
+                            <th>Tus Comentarios</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Sección para ver mis solicitudes -->
+        <section class="card" id="mis-solicitudes-section" style="display: none;">
+            <header>
+                <div>
+                    <h3>Mis Solicitudes de Autorización</h3>
+                    <p>Historial de solicitudes creadas</p>
+                </div>
+                <button class="ghost" id="refresh-mis-solicitudes">🔄 Actualizar</button>
+            </header>
+            <div class="table-wrapper">
+                <table id="mis-solicitudes-table">
+                    <thead>
+                        <tr>
+                            <th>SKU</th>
+                            <th>Transporte</th>
+                            <th>Precio Propuesto</th>
+                            <th>Cliente</th>
+                            <th>Estado</th>
+                            <th>Autorizador</th>
+                            <th>Fecha Solicitud</th>
+                            <th>Fecha Respuesta</th>
+                            <th>Comentarios</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+        <!-- Dashboard integrado en la interfaz de roles -->
+        <section class="card" id="dashboard-section" style="display:none;">
+            <header>
+                <h3>Panel de Métricas (Vendedores)</h3>
+                <div style="display:flex; gap:0.5rem; align-items:center;">
+                    <label>Periodo: <select id="dash-period"><option value="30">30 días</option><option value="90">90 días</option><option value="365">Año</option></select></label>
+                    <label>Vendedor: <select id="dash-vendedor"><option value="all">Todos</option></select></label>
+                    <button id="dash-refresh" class="ghost">🔄 Refrescar</button>
+                    <button id="dash-demo" class="ghost">🎛️ Cargar demo</button>
+                </div>
+            </header>
+            <div class="grid" style="margin-top:12px">
+                <div class="card metric-card">
+                    <h4>Total Ventas <span class="metric-info" data-tooltip="Suma del valor de las cotizaciones en el periodo seleccionado. Mide el volumen comercial y ayuda a seguir la tendencia de ventas.">i</span></h4>
+                    <div id="totalVentas">—</div>
+                </div>
+                <div class="card metric-card">
+                    <h4>Promedio Valor <span class="metric-info" data-tooltip="Valor promedio por cotización. Indica el tamaño medio de los negocios y ayuda a detectar cambios en mix de clientes o productos.">i</span></h4>
+                    <div id="avgValor">—</div>
+                </div>
+                <div class="card metric-card">
+                    <h4>Win Rate <span class="metric-info" data-tooltip="Porcentaje de cotizaciones ganadas respecto al total. Es una métrica de efectividad comercial y evaluación de conversión.">i</span></h4>
+                    <div id="winRate">—</div>
+                </div>
+                <div class="card metric-card">
+                    <h4>Avg Margin <span class="metric-info" data-tooltip="Margen promedio obtenido sobre las ventas. Mide rentabilidad y permite controlar descuentos y políticas de precio.">i</span></h4>
+                    <div id="avgMargin">—</div>
+                </div>
+            </div>
+            <h4 style="margin-top:12px">Gráficas</h4>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div class="card"><div id="ventasChart" style="height:260px"></div></div>
+                <div class="card"><div id="topClients" style="height:260px"></div></div>
+            </div>
+            <h4 style="margin-top:12px">Resumen por Vendedor</h4>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:8px;margin-bottom:8px;">
+                <input id="vendedor-search" placeholder="Buscar vendedor..." style="flex:1;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:var(--text);" />
+                <button id="vendedor-export" class="ghost" style="white-space:nowrap;">Exportar CSV</button>
+                <small style="color:var(--muted)">Clic en encabezado para ordenar</small>
+            </div>
+            <div class="table-wrapper">
+                <table id="vendedorTable" class="display" style="width:100%">
+                    <thead>
+                        <tr>
+                                    <th data-sort="none">Trend</th>
+                                    <th data-sort="string">Vendedor</th>
+                            <th data-sort="number">Cotizaciones</th>
+                            <th data-sort="number">Cerradas</th>
+                            <th data-sort="number">Ventas Totales</th>
+                            <th data-sort="number">Ventas Cerradas</th>
+                            <th data-sort="number">Tasa Cierre %</th>
+                            <th data-sort="number">Avg Discount</th>
+                            <th data-sort="number">Avg Margin</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:8px;">
+                <button id="vendedor-prev" class="ghost">Anterior</button>
+                <span id="vendedor-page" style="color:var(--muted)">1</span>
+                <button id="vendedor-next" class="ghost">Siguiente</button>
+                <label style="color:var(--muted);margin-left:12px">Por página:
+                    <select id="vendedor-pagesize" style="margin-left:6px;padding:6px;border-radius:6px;background:transparent;color:var(--text)">
+                        <option>10</option>
+                        <option selected>20</option>
+                        <option>50</option>
+                    </select>
+                </label>
+            </div>
+            <h4 style="margin-top:12px">Cotizaciones Recientes</h4>
+            <div class="table-wrapper"><table id="cotTable" class="display" style="width:100%"><thead><tr><th>Folio</th><th>Fecha</th><th>Cliente</th><th>Vendedor</th><th>Valor</th><th>Estado</th></tr></thead><tbody></tbody></table></div>
+        </section>
+
+    <!-- Librerías para el dashboard (Plotly, jQuery, DataTables) -->
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.7.1/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/datatables.net@1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+
+    <script src="app.js" type="module"></script>
+    <!-- Modal para solicitud de descuento adicional -->
+    <div id="discount-modal" class="modal" style="display:none;">
+        <div class="modal-backdrop"></div>
+        <div class="modal-content">
+            <button class="modal-close" id="modal-close">×</button>
+            <h3 id="modal-title">Descuento no autorizado</h3>
+            <p id="modal-body">El descuento solicitado excede tu límite autorizado.</p>
+            <div style="display:flex; gap:0.5rem; margin-top:1rem; justify-content:flex-end;">
+                <button class="ghost" id="modal-cancel">Cancelar</button>
+                <button class="primary" id="modal-request-auth">Solicitar autorización</button>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

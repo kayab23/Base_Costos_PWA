@@ -114,6 +114,9 @@ def read_catalogo(ws) -> List[Dict[str, Any]]:
         fecha_act = row_data[9] if len(row_data) > 9 else None
         activo = row_data[10] if len(row_data) > 10 else "Si"
         
+        fecha_actualizacion = None
+        if fecha_act is not None:
+            fecha_actualizacion = fecha_act.date() if hasattr(fecha_act, "date") else fecha_act
         rows.append(
             {
                 "sku": sku.strip() if isinstance(sku, str) else str(sku),
@@ -126,7 +129,7 @@ def read_catalogo(ws) -> List[Dict[str, Any]]:
                 "moneda_base": (moneda or "USD").strip() if isinstance(moneda, str) else "USD",
                 "activo": bool_from_str(activo),
                 "costo_base": to_decimal(costo_base),
-                "fecha_actualizacion": fecha_act.date() if hasattr(fecha_act, "date") else fecha_act,
+                "fecha_actualizacion": fecha_actualizacion,
                 "notas": None,
             }
         )

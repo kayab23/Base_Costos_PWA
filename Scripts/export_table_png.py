@@ -18,7 +18,7 @@ page_rect = page.rect  # in points (1/72 inch)
 zoom = 2  # 144 dpi
 mat = fitz.Matrix(zoom, zoom)
 pix = page.get_pixmap(matrix=mat, alpha=False)
-img = Image.frombytes('RGB', [pix.width, pix.height], pix.samples)
+img = Image.frombytes('RGB', (pix.width, pix.height), pix.samples)
 
 # Approximate table area in PDF points (based on template):
 # left margin = 40pt, usable width ~= 532pt
@@ -55,8 +55,15 @@ if top_px >= bottom_px or left_px >= right_px:
     raise SystemExit(2)
 
 crop = img.crop((left_px, top_px, right_px, bottom_px))
-# Optionally resize for easier viewing
-crop = crop.resize((int((right_px-left_px)*1.2), int((bottom_px-top_px)*1.2)), Image.LANCZOS)
+# Optionally resize for easier viewing (handle Pillow versions)
+resample = getattr(Image, 'LANCZOS', None)
+if resample is None:
+    # Pillow >=9 uses Image.Resampling
+    resample = getattr(getattr(Image, 'Resampling', Image), 'LANCZOS', None)
+if resample is None:
+    # fallback to a known resampling constant across Pillow versions
+    resample = getattr(getattr(Image, 'Resampling', Image), 'BICUBIC', None) or getattr(Image, 'BICUBIC', getattr(Image, 'NEAREST', None))
+crop = crop.resize((int((right_px-left_px)*1.2), int((bottom_px-top_px)*1.2)), resample)
 
 crop.save(OUT_PATH)
 print('Saved table preview to', OUT_PATH)

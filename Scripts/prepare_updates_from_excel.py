@@ -20,7 +20,10 @@ def main(path=None):
         print(json.dumps({"error": f"File not found: {path}"}))
         return 2
     wb = load_workbook(path, read_only=True, data_only=True)
-    ws = wb.active
+    ws = wb.active if wb is not None else None
+    if ws is None or not hasattr(ws, 'iter_rows'):
+        print(json.dumps({"error": "No worksheet available in workbook"}))
+        return 2
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
         print(json.dumps({"error": "Sheet is empty"}))
@@ -50,17 +53,23 @@ def main(path=None):
         sku_str = str(sku).strip()
         if not sku_str:
             continue
+        def safe_float(v):
+            if v is None:
+                return None
+            try:
+                if isinstance(v, (int, float)):
+                    return float(v)
+                s = str(v).strip()
+                if s == "":
+                    return None
+                return float(s.replace(',', '.'))
+            except Exception:
+                return None
+
         price_val = None
         if price_idx is not None and price_idx < len(r):
             price = r[price_idx]
-            if price is not None and price != "":
-                try:
-                    price_val = float(price)
-                except Exception:
-                    try:
-                        price_val = float(str(price).replace(',', '.'))
-                    except Exception:
-                        price_val = None
+            price_val = safe_float(price)
         updates.append((sku_str, price_val))
     # Build SQL statements (update costo_base and fecha_actualizacion)
     sql_lines = [

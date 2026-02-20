@@ -1,4 +1,4 @@
-"""Exportador de SKUs y precios a Excel.
+r"""Exportador de SKUs y precios a Excel.
 
 Genera un archivo Excel con las columnas:
 - sku
@@ -120,7 +120,9 @@ def aggregate(rows):
 def write_excel(rows, outpath: Path):
     wb = Workbook()
     ws = wb.active
+    assert ws is not None, "Worksheet not created"
     ws.title = 'SKU_Precios'
+    # ensure header row
     ws.append(SKU_COLS)
     for r in rows:
         ws.append([

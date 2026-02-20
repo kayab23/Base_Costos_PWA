@@ -19,7 +19,10 @@ def main(path=None):
         print(json.dumps({"error": f"File not found: {path}"}))
         return 2
     wb = load_workbook(path, read_only=True, data_only=True)
-    ws = wb.active
+    ws = wb.active if wb is not None else None
+    if ws is None or not hasattr(ws, 'iter_rows'):
+        print(json.dumps({"error": "No worksheet available in workbook"}))
+        return 2
     rows = list(ws.iter_rows(values_only=True))
     if not rows:
         print(json.dumps({"error": "Sheet is empty"}))
@@ -53,15 +56,21 @@ def main(path=None):
         sku_str = str(sku).strip()
         if sku_str == "":
             continue
-        price_val = None
-        if price is not None and price != "":
+        def safe_float(v):
+            if v is None:
+                return None
             try:
-                price_val = float(price)
+                # prefer numeric types directly
+                if isinstance(v, (int, float)):
+                    return float(v)
+                s = str(v).strip()
+                if s == "":
+                    return None
+                return float(s.replace(',', '.'))
             except Exception:
-                try:
-                    price_val = float(str(price).replace(',', '.'))
-                except Exception:
-                    price_val = None
+                return None
+
+        price_val = safe_float(price)
         results.append({"sku": sku_str, "precio": price_val})
     out = {"file": str(path), "rows_total": len(rows)-1, "detected": len(results), "sample": results[:20], "items": results}
     print(json.dumps(out, ensure_ascii=False))

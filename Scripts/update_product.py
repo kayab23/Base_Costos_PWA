@@ -26,7 +26,8 @@ try:
     # Ensure the costo_base column exists before making any updates to avoid
     # doing an UPDATE then rolling it back due to a failing ALTER TABLE.
     cur.execute("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME='Productos' AND COLUMN_NAME='costo_base'")
-    exists = cur.fetchone()[0]
+    row = cur.fetchone()
+    exists = row[0] if row else 0
     if not exists:
         cur.execute("ALTER TABLE dbo.Productos ADD costo_base DECIMAL(18,6) NULL")
         conn.commit()

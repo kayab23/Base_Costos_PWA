@@ -1,4 +1,4 @@
-"""
+r"""
 Exporta un catálogo de SKUs con landed cost y mark-up a un archivo Excel.
 Genera: outputs/catalog_landed_markup_YYYYMMDD_HHMMSS.xlsx
 
@@ -45,7 +45,9 @@ def fetch_to_df(conn_str: str) -> pd.DataFrame:
     cols = [c[0] for c in cur.description]
     rows = cur.fetchall()
     conn.close()
-    df = pd.DataFrame.from_records(rows, columns=cols)
+    # Convert pyodbc rows to list of dicts for pandas
+    dict_rows = [dict(zip(cols, r)) for r in rows]
+    df = pd.DataFrame.from_records(dict_rows, columns=cols)
     return df
 
 

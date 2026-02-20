@@ -13,6 +13,7 @@ from fastapi import Response, FastAPI
 from slowapi import _rate_limit_exceeded_handler
 from app.limiter import limiter
 from slowapi.errors import RateLimitExceeded
+from typing import Any, cast
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .config import settings
@@ -23,7 +24,9 @@ from .db import connection_scope
 # Inicializar aplicación FastAPI con configuración desde settings
 app = FastAPI(title=settings.api_title, version=settings.api_version)
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+# slowapi handler has a typing signature that pyright/mypy may not accept directly
+# cast to Any to satisfy the static checker while preserving runtime behavior
+app.add_exception_handler(RateLimitExceeded, cast(Any, _rate_limit_exceeded_handler))
 
 # Configurar CORS para permitir peticiones desde el frontend
 app.add_middleware(
